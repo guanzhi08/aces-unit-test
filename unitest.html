@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACES Unit Test Practice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls label {
+            display: inline-block;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .controls input[type="number"], .controls button {
+            margin: 5px;
+            padding: 8px 12px;
+        }
+        .controls select {
+            margin: 5px;
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: white;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button.submit-btn {
+            background-color: #dc3545;
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        button.submit-btn:hover {
+            background-color: #c82333;
+        }
+        #examArea {
+            margin-top: 20px;
+        }
+        .question-item {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .question-number {
+            font-weight: bold;
+            color: #666;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+        }
+        .chinese-word {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .answer-section {
+            margin-bottom: 20px;
+        }
+        .answer-row {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .answer-group {
+            flex: 1;
+        }
+        .answer-group.input-group {
+            flex: 3;
+        }
+        .answer-group.type-group {
+            flex: 2;
+        }
+        .answer-group.submit-group {
+            flex: 1;
+        }
+        .answer-label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+        .answer-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 20px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .answer-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .answer-input.correct {
+            background-color: #d4edda;
+            border-color: #28a745;
+        }
+        .answer-input.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+        }
+        .answer-input:disabled {
+            background-color: #f5f5f5;
+        }
+        .type-select {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            text-align: center;
+            background-color: white;
+            cursor: pointer;
+        }
+        .type-select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .type-select.correct {
+            background-color: #d4edda;
+            border-color: #28a745;
+        }
+        .type-select.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+        }
+        .type-select:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+        .correct-answer {
+            color: #28a745;
+            font-weight: bold;
+            margin-top: 15px;
+            font-size: 18px;
+            display: none;
+        }
+        .show-answer .correct-answer {
+            display: block;
+        }
+        .navigation-buttons {
+            margin-top: 30px;
+        }
+        .navigation-buttons button {
+            padding: 12px 30px;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        .virtual-keyboard {
+            margin-top: 15px;
+            max-width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .key {
+            background-color: #fff;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 2px;
+            min-width: 40px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 500;
+            transition: all 0.1s;
+            user-select: none;
+        }
+        .key:hover {
+            background-color: #e8e8e8;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .key:active {
+            background-color: #d0d0d0;
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .key.space {
+            min-width: 280px;
+        }
+        .key.special {
+            background-color: #f0f0f0;
+            min-width: 70px;
+        }
+        .key.shift {
+            min-width: 75px;
+        }
+        .key.active {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #45a049;
+        }
+        .key.nav-btn {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #45a049;
+            font-weight: bold;
+        }
+        .key.nav-btn:hover {
+            background-color: #45a049;
+            border-color: #3d8b40;
+        }
+        .key.nav-btn.disabled {
+            background-color: #ccc;
+            color: #666;
+            border-color: #999;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .key.nav-btn.disabled:hover {
+            background-color: #ccc;
+            transform: none;
+            box-shadow: none;
+        }
+        .result-summary {
+            background-color: #fff;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .result-summary h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 20px 0;
+        }
+        .score.low {
+            color: #dc3545;
+        }
+        .score.medium {
+            color: #ffc107;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>ACES Unit Test Practice</h1>
+    
+    <div class="controls">
+        <div>
+            <label for="unitNumber">Unit:</label>
+            <select id="unitNumber">
+                <option value="">Loading...</option>
+            </select>
+            <label for="questionCount">題數:</label>
+            <select id="questionCount">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="ALL">ALL</option>
+            </select>
+            <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
+            <button onclick="startExam()" id="startBtn">模擬考</button>
+            <button onclick="resetExam()" id="resetBtn">重置</button>            
+        </div>
+    </div>
+
+    <div id="examArea"></div>
+
+    <script>
+        let currentData = [];
+        let userAnswers = [];
+        let userTypes = [];
+        let currentIndex = 0;
+        let WORD_TYPES = [];
+        const CSV_FILE = 'ACES-S5-Unit.csv';
+
+        // Load available units on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            loadAvailableUnits();
+        });
+
+        function loadAvailableUnits() {
+            fetch(CSV_FILE)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('CSV file not found.');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    const data = parseCSV(text);
+                    
+                    // Extract unique unit numbers
+                    const unitsSet = new Set();
+                    data.forEach(row => {
+                        const unit = row.Unit;
+                        if (unit && unit.trim()) {
+                            unitsSet.add(unit.trim());
+                        }
+                    });
+                    
+                    // Sort units numerically
+                    const units = Array.from(unitsSet).sort((a, b) => {
+                        const numA = parseInt(a);
+                        const numB = parseInt(b);
+                        return numA - numB;
+                    });
+                    
+                    // Populate dropdown
+                    const unitSelect = document.getElementById('unitNumber');
+                    unitSelect.innerHTML = '';
+                    
+                    units.forEach(unit => {
+                        const option = document.createElement('option');
+                        option.value = unit;
+                        option.textContent = `${unit}`;
+                        if (unit === '62') {
+                            option.selected = true;
+                        }
+                        unitSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading units:', error);
+                    const unitSelect = document.getElementById('unitNumber');
+                    unitSelect.innerHTML = '<option value="">Error loading units</option>';
+                });
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                
+                const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] || '';
+                });
+                data.push(row);
+            }
+            
+            return data;
+        }
+
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function normalizeText(text) {
+            // Normalize: lowercase, trim, remove extra spaces
+            return text.toLowerCase().trim().replace(/\s+/g, ' ');
+        }
+
+        function startExam() {
+            const unitNumber = document.getElementById('unitNumber').value;
+            const questionCountValue = document.getElementById('questionCount').value;
+            
+            fetch(CSV_FILE)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('CSV file not found. Make sure ACES-S5-Unit.csv is in the same directory.');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    const data = parseCSV(text);
+                    
+                    // Filter by unit
+                    let filteredData = data.filter(row => row.Unit === unitNumber);
+                    
+                    if (filteredData.length === 0) {
+                        alert(`No data found for Unit ${unitNumber}`);
+                        return;
+                    }
+                    
+                    // Extract unique word types from the filtered unit data only
+                    const typesSet = new Set();
+                    filteredData.forEach(row => {
+                        const type = row.Type || row.PoS || '';
+                        if (type.trim()) {
+                            typesSet.add(type.trim());
+                        }
+                    });
+                    WORD_TYPES = Array.from(typesSet).sort();
+                    
+                    // Shuffle the data by default
+                    filteredData = shuffleArray(filteredData);
+                    
+                    // Limit questions based on selection
+                    if (questionCountValue !== 'ALL') {
+                        const count = parseInt(questionCountValue);
+                        filteredData = filteredData.slice(0, count);
+                    }
+                    
+                    currentData = filteredData;
+                    userAnswers = new Array(currentData.length).fill('');
+                    userTypes = new Array(currentData.length).fill('');
+                    currentIndex = 0;
+                    
+                    document.getElementById('startBtn').textContent = '重出題';
+                    
+                    showQuestion(0);
+                })
+                .catch(error => {
+                    alert(error.message);
+                });
+        }
+
+        function showQuestion(index) {
+            if (index < 0 || index >= currentData.length) return;
+            
+            currentIndex = index;
+            const row = currentData[index];
+            
+            const typeOptions = WORD_TYPES.map(type => 
+                `<option value="${type}" ${userTypes[index] === type ? 'selected' : ''}>${type}</option>`
+            ).join('');
+            
+            const html = `
+            <div class="question-item" id="current-question">
+                <div class="chinese-word">${row.Chinese}</div>
+                
+                <div class="answer-row">
+                    <div class="answer-group input-group">
+                        <input type="text" 
+                               class="answer-input" 
+                               id="current-answer" 
+                               placeholder="Use virtual keyboard..."
+                               value="${userAnswers[index] || ''}"
+                               readonly
+                               onfocus="this.blur();"
+                               autocomplete="off"
+                               autocorrect="off"
+                               autocapitalize="off"
+                               spellcheck="false">
+                    </div>
+                    
+                    <div class="answer-group type-group">
+                        <select class="type-select" id="current-type" onchange="updateType(${index}, this.value)">
+                            <option value="">-- Select Type --</option>
+                            ${typeOptions}
+                        </select>
+                    </div>
+
+                    <div class="answer-group submit-group">
+                        <button onclick="submitExam()" class="submit-btn">交卷</button>
+                    </div>
+                    <div class="question-number">${index + 1}/${currentData.length}</div>
+                </div>
+                
+                <div class="virtual-keyboard">
+                    <div class="keyboard-row">
+                        <div class="key letter-key" onclick="typeKey('q')">q</div>
+                        <div class="key letter-key" onclick="typeKey('w')">w</div>
+                        <div class="key letter-key" onclick="typeKey('e')">e</div>
+                        <div class="key letter-key" onclick="typeKey('r')">r</div>
+                        <div class="key letter-key" onclick="typeKey('t')">t</div>
+                        <div class="key letter-key" onclick="typeKey('y')">y</div>
+                        <div class="key letter-key" onclick="typeKey('u')">u</div>
+                        <div class="key letter-key" onclick="typeKey('i')">i</div>
+                        <div class="key letter-key" onclick="typeKey('o')">o</div>
+                        <div class="key letter-key" onclick="typeKey('p')">p</div>
+                    </div>
+                    <div class="keyboard-row">
+                        <div class="key letter-key" onclick="typeKey('a')">a</div>
+                        <div class="key letter-key" onclick="typeKey('s')">s</div>
+                        <div class="key letter-key" onclick="typeKey('d')">d</div>
+                        <div class="key letter-key" onclick="typeKey('f')">f</div>
+                        <div class="key letter-key" onclick="typeKey('g')">g</div>
+                        <div class="key letter-key" onclick="typeKey('h')">h</div>
+                        <div class="key letter-key" onclick="typeKey('j')">j</div>
+                        <div class="key letter-key" onclick="typeKey('k')">k</div>
+                        <div class="key letter-key" onclick="typeKey('l')">l</div>
+                    </div>
+                    <div class="keyboard-row">
+                        <div class="key shift" onclick="toggleShift()" id="shift-key">Shift</div>
+                        <div class="key letter-key" onclick="typeKey('z')">z</div>
+                        <div class="key letter-key" onclick="typeKey('x')">x</div>
+                        <div class="key letter-key" onclick="typeKey('c')">c</div>
+                        <div class="key letter-key" onclick="typeKey('v')">v</div>
+                        <div class="key letter-key" onclick="typeKey('b')">b</div>
+                        <div class="key letter-key" onclick="typeKey('n')">n</div>
+                        <div class="key letter-key" onclick="typeKey('m')">m</div>
+                        <div class="key special" onclick="backspace()">⌫ Back</div>
+                    </div>
+                    <div class="keyboard-row">
+                        <div class="key" onclick="typeKey('(')">(</div>
+                        <div class="key" onclick="typeKey(')')">)</div>
+                        <div class="key" onclick="typeKey('\\'')">\'</div>
+                        <div class="key" onclick="typeKey('/')">/</div>
+                        <div class="key space" onclick="typeKey(' ')">Space</div>
+                        <div class="key nav-btn ${index === 0 ? 'disabled' : ''}" onclick="previousQuestion()"><</div>
+                        <div class="key nav-btn ${index === currentData.length - 1 ? 'disabled' : ''}" onclick="nextQuestion()">></div>
+                    </div>
+                </div>
+            </div>`;
+            
+            document.getElementById('examArea').innerHTML = html;
+            
+            // Set cursor to the end of the answer input
+            const answerInput = document.getElementById('current-answer');
+            if (answerInput && answerInput.value) {
+                const len = answerInput.value.length;
+                answerInput.setSelectionRange(len, len);
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                nextQuestion();
+            }
+        }
+
+        function previousQuestion() {
+            if (currentIndex === 0) return;
+            saveCurrentAnswer();
+            showQuestion(currentIndex - 1);
+        }
+
+        function nextQuestion() {
+            if (currentIndex >= currentData.length - 1) return;
+            saveCurrentAnswer();
+            showQuestion(currentIndex + 1);
+        }
+
+        function saveCurrentAnswer() {
+            const input = document.getElementById('current-answer');
+            const typeSelect = document.getElementById('current-type');
+            if (input) {
+                userAnswers[currentIndex] = input.value;
+            }
+            if (typeSelect) {
+                userTypes[currentIndex] = typeSelect.value;
+            }
+        }
+
+        function updateType(index, value) {
+            userTypes[index] = value;
+        }
+
+        let shiftActive = false;
+
+        function typeKey(char) {
+            const input = document.getElementById('current-answer');
+            if (!input) return;
+            
+            // Save cursor position before any operations
+            let start = input.selectionStart;
+            let end = input.selectionEnd;
+            const text = input.value;
+            
+            // Apply shift if active
+            const charToInsert = shiftActive ? char.toUpperCase() : char;
+            
+            // Insert character at cursor position
+            input.value = text.substring(0, start) + charToInsert + text.substring(end);
+            
+            // Set cursor position after inserted character
+            const newPosition = start + 1;
+            
+            // Set cursor position without focusing to avoid keyboard popup
+            input.setSelectionRange(newPosition, newPosition);
+            
+            // Reset shift after typing
+            if (shiftActive) {
+                shiftActive = false;
+                const shiftKey = document.getElementById('shift-key');
+                if (shiftKey) shiftKey.classList.remove('active');
+                
+                // Reset letter key display to lowercase
+                const letterKeys = document.querySelectorAll('.letter-key');
+                letterKeys.forEach(key => {
+                    key.textContent = key.textContent.toLowerCase();
+                });
+            }
+        }
+
+        function backspace() {
+            const input = document.getElementById('current-answer');
+            if (!input) return;
+            
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            const text = input.value;
+            let newPosition;
+            
+            if (start !== end) {
+                // Delete selection
+                input.value = text.substring(0, start) + text.substring(end);
+                newPosition = start;
+            } else if (start > 0) {
+                // Delete character before cursor
+                input.value = text.substring(0, start - 1) + text.substring(start);
+                newPosition = start - 1;
+            } else {
+                return;
+            }
+            
+            // Set cursor position without focusing to avoid keyboard popup
+            input.setSelectionRange(newPosition, newPosition);
+        }
+
+        function toggleShift() {
+            shiftActive = !shiftActive;
+            const shiftKey = document.getElementById('shift-key');
+            if (shiftKey) {
+                if (shiftActive) {
+                    shiftKey.classList.add('active');
+                } else {
+                    shiftKey.classList.remove('active');
+                }
+            }
+            
+            // Update letter key display
+            const letterKeys = document.querySelectorAll('.letter-key');
+            letterKeys.forEach(key => {
+                const currentText = key.textContent;
+                if (shiftActive) {
+                    key.textContent = currentText.toUpperCase();
+                } else {
+                    key.textContent = currentText.toLowerCase();
+                }
+            });
+        }
+
+        function clearInput() {
+            const input = document.getElementById('current-answer');
+            if (!input) return;
+            
+            input.value = '';
+            input.setSelectionRange(0, 0);
+        }
+
+        function submitExam() {
+            if (currentData.length === 0) {
+                alert('Please start the exam first');
+                return;
+            }
+
+            // Save current answer before submitting
+            saveCurrentAnswer();
+
+            let correctCount = 0;
+            let incorrectCount = 0;
+            let typeCorrectCount = 0;
+            let reviewHTML = '<div style="background-color: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
+            
+            currentData.forEach((row, index) => {
+                const userAnswer = normalizeText(userAnswers[index] || '');
+                const correctAnswer = normalizeText(row.English || '');
+                const userType = userTypes[index] || '';
+                const correctType = row.Type || row.PoS || '';
+                
+                const isAnswerCorrect = userAnswer === correctAnswer;
+                const isTypeCorrect = userType === correctType;
+                const isBothCorrect = isAnswerCorrect && isTypeCorrect;
+                
+                if (isBothCorrect) {
+                    correctCount++;
+                    typeCorrectCount++;
+                } else if (isAnswerCorrect) {
+                    typeCorrectCount += 0.5;
+                } else {
+                    incorrectCount++;
+                }
+                
+                const statusColor = isBothCorrect ? '#28a745' : (isAnswerCorrect ? '#ffc107' : '#dc3545');
+                const bgColor = isBothCorrect ? '#d4edda' : (isAnswerCorrect ? '#fff3cd' : '#f8d7da');
+                
+                reviewHTML += `
+                <div style="padding: 15px; margin-bottom: 10px; border-left: 4px solid ${statusColor}; background-color: ${bgColor};">
+                    <div><strong>Q${index + 1}:</strong> ${row.Chinese}</div>
+                    <div>Your answer: <strong>${userAnswers[index] || '(no answer)'}</strong> ${isAnswerCorrect ? '✓' : '✗'}</div>
+                    <div>Your type: <strong>${userType || '(no answer)'}</strong> ${isTypeCorrect ? '✓' : '✗'}</div>
+                    ${!isBothCorrect ? `<div style="color: ${statusColor};">Correct: <strong>${row.English}</strong> (${correctType})</div>` : ''}
+                </div>`;
+            });
+            
+            reviewHTML += '</div>';
+            
+            const totalQuestions = currentData.length;
+            const percentage = Math.round((correctCount / totalQuestions) * 100);
+            const typePercentage = Math.round((typeCorrectCount / totalQuestions) * 100);
+            let scoreClass = 'low';
+            if (percentage >= 80) scoreClass = '';
+            else if (percentage >= 60) scoreClass = 'medium';
+            
+            const resultHTML = `
+            <div class="result-summary">
+                <h2>Exam Results</h2>
+                <div class="score ${scoreClass}">${percentage}%</div>
+                <div style="font-size: 18px; color: #666; margin-bottom: 10px;">Type Accuracy: ${typePercentage}%</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-number">${correctCount}</div>
+                        <div class="stat-label">Both Correct</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${incorrectCount}</div>
+                        <div class="stat-label">Incorrect</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${totalQuestions}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
+            </div>`;
+            
+            document.getElementById('examArea').innerHTML = resultHTML + reviewHTML;
+        }
+
+        function resetExam() {
+            currentData = [];
+            userAnswers = [];
+            userTypes = [];
+            currentIndex = 0;
+            document.getElementById('examArea').innerHTML = '';
+            document.getElementById('startBtn').textContent = '模擬考';
+        }
+
+        function showVocabularyTable() {
+            const unitNumber = document.getElementById('unitNumber').value;
+            
+            fetch(CSV_FILE)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('CSV file not found. Make sure ACES-S5-Unit.csv is in the same directory.');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    const data = parseCSV(text);
+                    
+                    // Filter by unit
+                    let filteredData = data.filter(row => row.Unit === unitNumber);
+                    
+                    if (filteredData.length === 0) {
+                        alert(`No data found for Unit ${unitNumber}`);
+                        return;
+                    }
+                    
+                    // Generate table HTML
+                    let tableHTML = `
+                    <div style="background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Unit ${unitNumber} Vocabulary Table</h2>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                            <thead>
+                                <tr style="background-color: #4CAF50; color: white;">
+                                    <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 50px;">No.</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">中文</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">英文</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">詞性</th>
+                                    <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 80px;">發音</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                    
+                    filteredData.forEach((row, index) => {
+                        const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+                        const englishWord = row.English.replace(/'/g, "\\'");
+                        tableHTML += `
+                                <tr style="background-color: ${bgColor};">
+                                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${index + 1}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${row.Chinese}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${row.English}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${row.Type || row.PoS || ''}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                                        <button onclick="pronounceWord('${englishWord}')" style="background-color: #007bff; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;">🔊</button>
+                                    </td>
+                                </tr>`;
+                    });
+                    
+                    tableHTML += `
+                            </tbody>
+                        </table>
+                        <div style="text-align: center;">
+                            <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">Close Table</button>
+                        </div>
+                    </div>`;
+                    
+                    document.getElementById('examArea').innerHTML = tableHTML;
+                })
+                .catch(error => {
+                    alert(error.message);
+                });
+        }
+
+        function pronounceWord(word) {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(word);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.6;
+                utterance.pitch = 1;
+                
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert('Sorry, your browser does not support text-to-speech.');
+            }
+        }
+    </script>
+</body>
+</html>
