@@ -336,6 +336,8 @@
         let currentIndex = 0;
         let WORD_TYPES = [];
         const CSV_FILE = 'ACES-S5-Unit.csv';
+        let shuffledPool = [];
+        let poolIndex = 0;
 
         // Load available units on page load
         window.addEventListener('DOMContentLoaded', function() {
@@ -455,16 +457,35 @@
                     });
                     WORD_TYPES = Array.from(typesSet).sort();
                     
-                    // Shuffle the data by default
-                    filteredData = shuffleArray(filteredData);
+                    // Determine how many questions we need
+                    const questionsNeeded = questionCountValue === 'ALL' ? filteredData.length : parseInt(questionCountValue);
                     
-                    // Limit questions based on selection
-                    if (questionCountValue !== 'ALL') {
-                        const count = parseInt(questionCountValue);
-                        filteredData = filteredData.slice(0, count);
+                    // Check if we need to reshuffle the pool
+                    if (shuffledPool.length === 0 || poolIndex + questionsNeeded > shuffledPool.length) {
+                        // Shuffle all data and reset pool
+                        shuffledPool = shuffleArray(filteredData);
+                        poolIndex = 0;
+                        console.log('🔀 Reshuffled pool - Total items:', shuffledPool.length);
                     }
                     
-                    currentData = filteredData;
+                    // Extract questions from the shuffled pool
+                    const selectedData = shuffledPool.slice(poolIndex, poolIndex + questionsNeeded);
+                    
+                    // Debug: Show which indexes are being used
+                    const selectedIndexes = [];
+                    selectedData.forEach(item => {
+                        const originalIndex = filteredData.findIndex(row => 
+                            row.Chinese === item.Chinese && row.English === item.English
+                        );
+                        selectedIndexes.push(originalIndex);
+                    });
+                    console.log(`📝 Exam started - Using indexes ${poolIndex} to ${poolIndex + questionsNeeded - 1} from pool`);
+                    console.log('📊 Original data indexes:', selectedIndexes.join(', '));
+                    console.log('🎯 Pool remaining after this exam:', shuffledPool.length - (poolIndex + questionsNeeded));
+                    
+                    poolIndex += questionsNeeded;
+                    
+                    currentData = selectedData;
                     userAnswers = new Array(currentData.length).fill('');
                     userTypes = new Array(currentData.length).fill('');
                     currentIndex = 0;
