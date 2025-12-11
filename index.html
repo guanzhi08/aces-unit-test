@@ -381,8 +381,16 @@
                     // Get ISO week number
                     function getISOWeek(date) {
                         const target = new Date(date.valueOf());
-                        const dayNr = (date.getDay() + 6) % 7; // Monday = 0
-                        target.setDate(target.getDate() - dayNr + 3); // Nearest Thursday
+                        const dayNr = (date.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+                        
+                        // If it's Thursday (3), Friday (4), Saturday (5), or Sunday (6), move to next week
+                        if (dayNr >= 3) {
+                            console.log('Moving to next week of year for Thursday or later');
+                            target.setDate(target.getDate() + (7 - dayNr) + 3); // Jump to next Thursday
+                        } else {
+                            target.setDate(target.getDate() - dayNr + 3); // Go to Thursday of current week
+                        }
+                        
                         const jan4 = new Date(target.getFullYear(), 0, 4);
                         const dayDiff = (target - jan4) / 86400000;
                         return 1 + Math.ceil(dayDiff / 7);
