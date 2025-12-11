@@ -375,11 +375,45 @@
                     const unitSelect = document.getElementById('unitNumber');
                     unitSelect.innerHTML = '';
                     
+                    // Calculate current week of year using ISO week date system
+                    const now = new Date();
+                    
+                    // Get ISO week number
+                    function getISOWeek(date) {
+                        const target = new Date(date.valueOf());
+                        const dayNr = (date.getDay() + 6) % 7; // Monday = 0
+                        target.setDate(target.getDate() - dayNr + 3); // Nearest Thursday
+                        const jan4 = new Date(target.getFullYear(), 0, 4);
+                        const dayDiff = (target - jan4) / 86400000;
+                        return 1 + Math.ceil(dayDiff / 7);
+                    }
+                    
+                    const weekOfYear = getISOWeek(now);
+                    const currentYear = now.getFullYear();
+                    
+                    // Mapping: week 50 of 2025 = unit 62
+                    // Base calculation: 62 - 50 = 12
+                    // For weeks in 2025: unit = week + 12
+                    // For weeks in 2026: unit = week + 64 (continuing from where 2025 ended)
+                    let targetUnit;
+                    if (currentYear === 2025) {
+                        targetUnit = String(weekOfYear + 12);
+                    } else if (currentYear === 2026) {
+                        const calculatedUnit = weekOfYear + 64;
+                        const maxUnit = Math.max(...units.map(u => parseInt(u)));
+                        console.log(`Calculated unit for 2026 week ${weekOfYear} is ${calculatedUnit}, max available unit is ${maxUnit}`);
+                        targetUnit = String(Math.min(calculatedUnit, maxUnit));
+                    } else {
+                        targetUnit = '60'; // fallback
+                    }
+                    
+                    console.log(`Week ${weekOfYear} of ${currentYear} → Unit ${targetUnit}`);
+                    
                     units.forEach(unit => {
                         const option = document.createElement('option');
                         option.value = unit;
                         option.textContent = `${unit}`;
-                        if (unit === '62') {
+                        if (unit === targetUnit) {
                             option.selected = true;
                         }
                         unitSelect.appendChild(option);
