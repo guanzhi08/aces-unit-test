@@ -304,15 +304,73 @@
         .hidden {
             display: none;
         }
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .user-section input {
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .user-section input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .stats-badge {
+            background-color: #e8f5e9;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #2e7d32;
+        }
+        .stats-badge.warning {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+        .score-curve-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .score-curve-container h3 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+        .chart-canvas {
+            width: 100%;
+            max-height: 300px;
+        }
+        .history-btn {
+            background-color: #2196F3;
+        }
+        .history-btn:hover {
+            background-color: #1976D2;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>ACES Unit Test Practice</h1>
     
     <div class="controls">
+        <div class="user-section">
+            <label for="username">👤 名字:</label>
+            <input type="text" id="username" placeholder="輸入名字..." onchange="loadUserStats()">
+            <span id="userStats" class="stats-badge hidden"></span>
+        </div>
         <div>
             <label for="unitNumber">Unit:</label>
-            <select id="unitNumber">
+            <select id="unitNumber" onchange="loadUserStats()">
                 <option value="">Loading...</option>
             </select>
             <label for="questionCount">題數:</label>
@@ -323,6 +381,7 @@
             </select>
             <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
             <button onclick="startExam()" id="startBtn">模擬考</button>
+            <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
             <button onclick="resetExam()" id="resetBtn">重置</button>            
         </div>
     </div>
@@ -336,13 +395,211 @@
         let currentIndex = 0;
         let WORD_TYPES = [];
         const CSV_FILE = 'ACES-S5-Unit.csv';
+        const API_BASE = '';  // Empty for same-origin, or set to 'http://localhost:8000' if needed
         let shuffledPool = [];
         let poolIndex = 0;
+        let scoreChart = null;
 
-        // Load available units on page load
+        // Load available units and saved username on page load
         window.addEventListener('DOMContentLoaded', function() {
             loadAvailableUnits();
+            // Load saved username from localStorage
+            const savedUsername = localStorage.getItem('acesUsername');
+            if (savedUsername) {
+                document.getElementById('username').value = savedUsername;
+                loadUserStats();
+            }
         });
+
+        // Save username to localStorage when changed
+        function saveUsername() {
+            const username = document.getElementById('username').value.trim();
+            if (username) {
+                localStorage.setItem('acesUsername', username);
+            }
+        }
+
+        // Load user statistics from backend
+        async function loadUserStats() {
+            const username = document.getElementById('username').value.trim();
+            const unitNumber = document.getElementById('unitNumber').value;
+            saveUsername();
+            
+            if (!username) {
+                document.getElementById('userStats').classList.add('hidden');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/stats/${encodeURIComponent(username)}?unit=${encodeURIComponent(unitNumber)}`);
+                if (response.ok) {
+                    const stats = await response.json();
+                    const statsEl = document.getElementById('userStats');
+                    
+                    if (stats.total_exams > 0) {
+                        statsEl.textContent = `📊 Unit ${unitNumber}: ${stats.total_exams} 次 | 平均: ${stats.average_score}% | 最高: ${stats.best_score}%`;
+                        statsEl.className = stats.average_score >= 80 ? 'stats-badge' : 'stats-badge warning';
+                        statsEl.classList.remove('hidden');
+                    } else {
+                        statsEl.textContent = `🆕 Unit ${unitNumber}: 尚無紀錄`;
+                        statsEl.className = 'stats-badge';
+                        statsEl.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.log('Backend not available, running in offline mode');
+                document.getElementById('userStats').classList.add('hidden');
+            }
+        }
+
+        // Save exam result to backend
+        async function saveExamResult(score, typeAccuracy, correctCount, totalQuestions) {
+            const username = document.getElementById('username').value.trim();
+            const unitNumber = document.getElementById('unitNumber').value;
+            
+            if (!username) {
+                console.log('No username, skipping save');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/results`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        unit_number: unitNumber,
+                        score: score,
+                        type_accuracy: typeAccuracy,
+                        correct_count: correctCount,
+                        total_questions: totalQuestions
+                    })
+                });
+                
+                if (response.ok) {
+                    console.log('Exam result saved successfully');
+                    loadUserStats();  // Refresh stats after saving
+                }
+            } catch (error) {
+                console.log('Backend not available, result not saved');
+            }
+        }
+
+        // Show score curve chart for selected unit
+        async function showScoreCurve() {
+            const username = document.getElementById('username').value.trim();
+            const unitNumber = document.getElementById('unitNumber').value;
+            
+            if (!username) {
+                alert('請先輸入名字');
+                return;
+            }
+            
+            try {
+                // Fetch data for the selected unit only
+                const response = await fetch(`${API_BASE}/api/curve/${encodeURIComponent(username)}?unit=${encodeURIComponent(unitNumber)}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch curve data');
+                }
+                
+                const data = await response.json();
+                
+                if (data.dates.length === 0) {
+                    alert(`Unit ${unitNumber} 還沒有考試紀錄`);
+                    return;
+                }
+                
+                const html = `
+                <div class="score-curve-container">
+                    <h3>📈 ${username} - Unit ${unitNumber} 成績曲線</h3>
+                    <canvas id="scoreChart" class="chart-canvas"></canvas>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">關閉</button>
+                    </div>
+                </div>`;
+                
+                document.getElementById('examArea').innerHTML = html;
+                
+                const ctx = document.getElementById('scoreChart').getContext('2d');
+                
+                if (scoreChart) {
+                    scoreChart.destroy();
+                }
+                
+                scoreChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.dates.map((d, i) => `#${i + 1}`),
+                        datasets: [
+                            {
+                                label: '分數 (%)',
+                                data: data.scores,
+                                borderColor: '#4CAF50',
+                                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 5,
+                                pointHoverRadius: 8
+                            },
+                            {
+                                label: '詞性正確率 (%)',
+                                data: data.type_accuracies,
+                                borderColor: '#2196F3',
+                                backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 5,
+                                pointHoverRadius: 8
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: '分數 (%)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '考試次數'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `Unit ${unitNumber}`,
+                                font: { size: 16 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(context) {
+                                        const idx = context[0].dataIndex;
+                                        return data.dates[idx];
+                                    }
+                                }
+                            },
+                            legend: {
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error loading score curve:', error);
+                alert('無法載入成績曲線，請確認後端服務已啟動');
+            }
+        }
 
         function loadAvailableUnits() {
             fetch(CSV_FILE)
@@ -808,6 +1065,9 @@
             let scoreClass = 'low';
             if (percentage >= 80) scoreClass = '';
             else if (percentage >= 60) scoreClass = 'medium';
+            
+            // Save result to backend
+            saveExamResult(percentage, typePercentage, correctCount, totalQuestions);
             
             const resultHTML = `
             <div class="result-summary">
