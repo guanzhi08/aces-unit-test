@@ -494,7 +494,7 @@
             }
         }
 
-        // Show score curve chart for selected unit
+        // Show score curve chart for selected unit with curves for each question count
         async function showScoreCurve() {
             const username = document.getElementById('username').value.trim();
             const unitNumber = document.getElementById('unitNumber').value;
@@ -505,15 +505,17 @@
             }
             
             try {
-                // Fetch data for the selected unit only
-                const response = await fetch(`${API_BASE}/api/curve/${encodeURIComponent(username)}?unit=${encodeURIComponent(unitNumber)}`);
+                // Fetch data grouped by question count
+                const response = await fetch(`${API_BASE}/api/curve-by-count/${encodeURIComponent(username)}?unit=${encodeURIComponent(unitNumber)}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch curve data');
                 }
                 
                 const data = await response.json();
                 
-                if (data.dates.length === 0) {
+                // Check if any data exists
+                const hasData = data['5'].dates.length > 0 || data['10'].dates.length > 0 || data['ALL'].dates.length > 0;
+                if (!hasData) {
                     alert(`Unit ${unitNumber} 還沒有考試紀錄`);
                     return;
                 }
@@ -535,32 +537,51 @@
                     scoreChart.destroy();
                 }
                 
+                // Build datasets for each question count
+                const datasets = [];
+                const colors = {
+                    '5': { border: '#4CAF50', bg: 'rgba(76, 175, 80, 0.1)' },
+                    '10': { border: '#2196F3', bg: 'rgba(33, 150, 243, 0.1)' },
+                    'ALL': { border: '#FF9800', bg: 'rgba(255, 152, 0, 0.1)' }
+                };
+                
+                // Find the maximum number of exams across all categories
+                const maxExams = Math.max(
+                    data['5'].dates.length,
+                    data['10'].dates.length,
+                    data['ALL'].dates.length
+                );
+                
+                // Create labels based on max exams
+                const labels = Array.from({length: maxExams}, (_, i) => `#${i + 1}`);
+                
+                // Store dates for tooltips
+                const allDates = {
+                    '5': data['5'].dates,
+                    '10': data['10'].dates,
+                    'ALL': data['ALL'].dates
+                };
+                
+                for (const [count, countData] of Object.entries(data)) {
+                    if (countData.scores.length > 0) {
+                        datasets.push({
+                            label: `${count} 題 (分數)`,
+                            data: countData.scores,
+                            borderColor: colors[count].border,
+                            backgroundColor: colors[count].bg,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 5,
+                            pointHoverRadius: 8
+                        });
+                    }
+                }
+                
                 scoreChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: data.dates.map((d, i) => `#${i + 1}`),
-                        datasets: [
-                            {
-                                label: '分數 (%)',
-                                data: data.scores,
-                                borderColor: '#4CAF50',
-                                backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 5,
-                                pointHoverRadius: 8
-                            },
-                            {
-                                label: '詞性正確率 (%)',
-                                data: data.type_accuracies,
-                                borderColor: '#2196F3',
-                                backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 5,
-                                pointHoverRadius: 8
-                            }
-                        ]
+                        labels: labels,
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,
@@ -584,14 +605,20 @@
                         plugins: {
                             title: {
                                 display: true,
-                                text: `Unit ${unitNumber}`,
+                                text: `Unit ${unitNumber} - 依題數分類`,
                                 font: { size: 16 }
                             },
                             tooltip: {
                                 callbacks: {
-                                    title: function(context) {
-                                        const idx = context[0].dataIndex;
-                                        return data.dates[idx];
+                                    afterLabel: function(context) {
+                                        const datasetLabel = context.dataset.label;
+                                        const idx = context.dataIndex;
+                                        // Extract count from label (e.g., "5 題 (分數)" -> "5")
+                                        const count = datasetLabel.split(' ')[0];
+                                        if (allDates[count] && allDates[count][idx]) {
+                                            return `時間: ${allDates[count][idx]}`;
+                                        }
+                                        return '';
                                     }
                                 }
                             },

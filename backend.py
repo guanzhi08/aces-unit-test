@@ -194,6 +194,47 @@ async def get_score_curve(username: str, unit: Optional[str] = None, limit: int 
     return ScoreCurveData(dates=dates, scores=scores, type_accuracies=type_accuracies)
 
 
+@app.get("/api/curve-by-count/{username}")
+async def get_score_curve_by_count(username: str, unit: Optional[str] = None):
+    """Get score curve data grouped by question count (5, 10, ALL) for a specific user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Define question count categories
+    categories = {
+        '5': (5, 5),
+        '10': (10, 10),
+        'ALL': (11, 1000)  # Anything more than 10 is considered "ALL"
+    }
+    
+    result = {}
+    for cat_name, (min_q, max_q) in categories.items():
+        if unit:
+            cursor.execute('''
+                SELECT exam_date, score, type_accuracy 
+                FROM exam_results 
+                WHERE username = ? AND unit_number = ? AND total_questions >= ? AND total_questions <= ?
+                ORDER BY exam_date ASC
+            ''', (username, unit, min_q, max_q))
+        else:
+            cursor.execute('''
+                SELECT exam_date, score, type_accuracy 
+                FROM exam_results 
+                WHERE username = ? AND total_questions >= ? AND total_questions <= ?
+                ORDER BY exam_date ASC
+            ''', (username, min_q, max_q))
+        
+        rows = cursor.fetchall()
+        result[cat_name] = {
+            'dates': [row['exam_date'][:16] for row in rows],
+            'scores': [row['score'] for row in rows],
+            'type_accuracies': [row['type_accuracy'] for row in rows]
+        }
+    
+    conn.close()
+    return result
+
+
 @app.get("/api/curve-by-unit/{username}")
 async def get_score_curve_by_unit(username: str):
     """Get score curve data grouped by unit for a specific user."""
