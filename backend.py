@@ -161,6 +161,14 @@ class UserStats(BaseModel):
     recent_scores: List[float]
 
 
+class ExamResultUpdate(BaseModel):
+    unit_number: Optional[str] = None
+    score: Optional[float] = None
+    type_accuracy: Optional[float] = None
+    correct_count: Optional[int] = None
+    total_questions: Optional[int] = None
+
+
 @app.post("/api/results", response_model=ExamResultResponse)
 async def save_exam_result(result: ExamResult):
     """Save an exam result to the database."""
@@ -222,6 +230,107 @@ async def get_user_results(username: str, limit: int = 50):
         total_questions=row['total_questions'],
         exam_date=format_exam_date(row['exam_date'])
     ) for row in rows]
+
+
+@app.get("/api/all-results", response_model=List[ExamResultResponse])
+async def get_all_results(limit: int = 500):
+    """Get all exam results (for admin view)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute(sql('''
+        SELECT * FROM exam_results 
+        ORDER BY exam_date DESC 
+        LIMIT ?
+    '''), (limit,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [ExamResultResponse(
+        id=row['id'],
+        username=row['username'],
+        unit_number=row['unit_number'],
+        score=row['score'],
+        type_accuracy=row['type_accuracy'],
+        correct_count=row['correct_count'],
+        total_questions=row['total_questions'],
+        exam_date=format_exam_date(row['exam_date'])
+    ) for row in rows]
+
+
+@app.put("/api/results/{result_id}", response_model=ExamResultResponse)
+async def update_exam_result(result_id: int, update: ExamResultUpdate):
+    """Update an exam result."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if record exists
+    cursor.execute(sql('SELECT * FROM exam_results WHERE id = ?'), (result_id,))
+    existing = cursor.fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    # Build update query dynamically
+    updates = []
+    values = []
+    if update.unit_number is not None:
+        updates.append('unit_number = ?')
+        values.append(update.unit_number)
+    if update.score is not None:
+        updates.append('score = ?')
+        values.append(update.score)
+    if update.type_accuracy is not None:
+        updates.append('type_accuracy = ?')
+        values.append(update.type_accuracy)
+    if update.correct_count is not None:
+        updates.append('correct_count = ?')
+        values.append(update.correct_count)
+    if update.total_questions is not None:
+        updates.append('total_questions = ?')
+        values.append(update.total_questions)
+    
+    if updates:
+        values.append(result_id)
+        query = f'UPDATE exam_results SET {", ".join(updates)} WHERE id = ?'
+        cursor.execute(sql(query), tuple(values))
+        conn.commit()
+    
+    # Fetch updated record
+    cursor.execute(sql('SELECT * FROM exam_results WHERE id = ?'), (result_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    return ExamResultResponse(
+        id=row['id'],
+        username=row['username'],
+        unit_number=row['unit_number'],
+        score=row['score'],
+        type_accuracy=row['type_accuracy'],
+        correct_count=row['correct_count'],
+        total_questions=row['total_questions'],
+        exam_date=format_exam_date(row['exam_date'])
+    )
+
+
+@app.delete("/api/results/{result_id}")
+async def delete_exam_result(result_id: int):
+    """Delete an exam result."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if record exists
+    cursor.execute(sql('SELECT id FROM exam_results WHERE id = ?'), (result_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    cursor.execute(sql('DELETE FROM exam_results WHERE id = ?'), (result_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Record deleted successfully", "id": result_id}
 
 
 @app.get("/api/curve/{username}", response_model=ScoreCurveData)

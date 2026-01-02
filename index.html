@@ -363,6 +363,121 @@
         .history-btn:hover {
             background-color: #1976D2;
         }
+        /* Exam Records Table Styles */
+        .records-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .records-container h3 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+        .records-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .records-toolbar select, .records-toolbar input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .records-table th, .records-table td {
+            padding: 10px 8px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .records-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        .records-table tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        .records-table tr:hover {
+            background-color: #e3f2fd;
+        }
+        .records-table input[type="number"] {
+            width: 60px;
+            padding: 4px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .records-table .btn-edit {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .records-table .btn-save {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .records-table .btn-cancel {
+            background-color: #9e9e9e;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .records-table .btn-delete {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .records-table .btn-edit:hover { background-color: #1976D2; }
+        .records-table .btn-save:hover { background-color: #388E3C; }
+        .records-table .btn-cancel:hover { background-color: #757575; }
+        .records-table .btn-delete:hover { background-color: #d32f2f; }
+        .table-wrapper {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        @media (max-width: 600px) {
+            .records-table {
+                font-size: 12px;
+            }
+            .records-table th, .records-table td {
+                padding: 6px 4px;
+            }
+            .records-table input[type="number"] {
+                width: 45px;
+            }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -389,6 +504,7 @@
             <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
             <button onclick="startExam()" id="startBtn">模擬考</button>
             <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
+            <button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
             <button onclick="resetExam()" id="resetBtn">重置</button>            
         </div>
     </div>
@@ -632,6 +748,226 @@
             } catch (error) {
                 console.error('Error loading score curve:', error);
                 alert('無法載入成績曲線，請確認後端服務已啟動');
+            }
+        }
+
+        // Global state for exam records
+        let allExamRecords = [];
+        let editingRecordId = null;
+
+        // Show exam records page
+        async function showExamRecords() {
+            try {
+                const response = await fetch(`${API_BASE}/api/all-results`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch records');
+                }
+                
+                allExamRecords = await response.json();
+                
+                // Get unique users for filter
+                const users = [...new Set(allExamRecords.map(r => r.username))].sort();
+                const units = [...new Set(allExamRecords.map(r => r.unit_number))].sort((a, b) => parseInt(a) - parseInt(b));
+                
+                const html = `
+                <div class="records-container">
+                    <h3>📋 考試紀錄管理</h3>
+                    <div class="records-toolbar">
+                        <div>
+                            <label>篩選用戶:</label>
+                            <select id="filterUser" onchange="filterRecords()">
+                                <option value="">全部用戶</option>
+                                ${users.map(u => `<option value="${u}">${u}</option>`).join('')}
+                            </select>
+                            <label>Unit:</label>
+                            <select id="filterUnit" onchange="filterRecords()">
+                                <option value="">全部Unit</option>
+                                ${units.map(u => `<option value="${u}">${u}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <span id="recordCount">共 ${allExamRecords.length} 筆紀錄</span>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="records-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用戶</th>
+                                    <th>Unit</th>
+                                    <th>分數</th>
+                                    <th>詞性正確率</th>
+                                    <th>答對/總題</th>
+                                    <th>日期時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">關閉</button>
+                    </div>
+                </div>`;
+                
+                document.getElementById('examArea').innerHTML = html;
+                renderRecordsTable(allExamRecords);
+                
+            } catch (error) {
+                console.error('Error loading exam records:', error);
+                alert('無法載入考試紀錄，請確認後端服務已啟動');
+            }
+        }
+
+        function renderRecordsTable(records) {
+            const tbody = document.getElementById('recordsBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = records.map(r => `
+                <tr id="row-${r.id}">
+                    <td>${r.id}</td>
+                    <td>${r.username}</td>
+                    <td id="cell-unit-${r.id}">${r.unit_number}</td>
+                    <td id="cell-score-${r.id}">${r.score}%</td>
+                    <td id="cell-type-${r.id}">${r.type_accuracy}%</td>
+                    <td>${r.correct_count}/${r.total_questions}</td>
+                    <td>${r.exam_date}</td>
+                    <td id="cell-actions-${r.id}">
+                        <button class="btn-edit" onclick="startEditRecord(${r.id})">編輯</button>
+                        <button class="btn-delete" onclick="deleteRecord(${r.id})">刪除</button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('recordCount').textContent = `共 ${records.length} 筆紀錄`;
+        }
+
+        function filterRecords() {
+            const userFilter = document.getElementById('filterUser').value;
+            const unitFilter = document.getElementById('filterUnit').value;
+            
+            let filtered = allExamRecords;
+            if (userFilter) {
+                filtered = filtered.filter(r => r.username === userFilter);
+            }
+            if (unitFilter) {
+                filtered = filtered.filter(r => r.unit_number === unitFilter);
+            }
+            
+            renderRecordsTable(filtered);
+        }
+
+        function startEditRecord(id) {
+            const record = allExamRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            // Replace cells with input fields
+            document.getElementById(`cell-unit-${id}`).innerHTML = 
+                `<input type="number" id="edit-unit-${id}" value="${record.unit_number}" min="1" max="200">`;
+            document.getElementById(`cell-score-${id}`).innerHTML = 
+                `<input type="number" id="edit-score-${id}" value="${record.score}" min="0" max="100" step="0.1">%`;
+            document.getElementById(`cell-type-${id}`).innerHTML = 
+                `<input type="number" id="edit-type-${id}" value="${record.type_accuracy}" min="0" max="100" step="0.1">%`;
+            document.getElementById(`cell-actions-${id}`).innerHTML = 
+                `<button class="btn-save" onclick="saveEditRecord(${id})">儲存</button>
+                 <button class="btn-cancel" onclick="cancelEditRecord(${id})">取消</button>`;
+            
+            editingRecordId = id;
+        }
+
+        function cancelEditRecord(id) {
+            const record = allExamRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            // Restore original values
+            document.getElementById(`cell-unit-${id}`).innerHTML = record.unit_number;
+            document.getElementById(`cell-score-${id}`).innerHTML = `${record.score}%`;
+            document.getElementById(`cell-type-${id}`).innerHTML = `${record.type_accuracy}%`;
+            document.getElementById(`cell-actions-${id}`).innerHTML = 
+                `<button class="btn-edit" onclick="startEditRecord(${id})">編輯</button>
+                 <button class="btn-delete" onclick="deleteRecord(${id})">刪除</button>`;
+            
+            editingRecordId = null;
+        }
+
+        async function saveEditRecord(id) {
+            const unitNumber = document.getElementById(`edit-unit-${id}`).value;
+            const score = parseFloat(document.getElementById(`edit-score-${id}`).value);
+            const typeAccuracy = parseFloat(document.getElementById(`edit-type-${id}`).value);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/results/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        unit_number: unitNumber,
+                        score: score,
+                        type_accuracy: typeAccuracy
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update record');
+                }
+                
+                const updated = await response.json();
+                
+                // Update local data
+                const index = allExamRecords.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    allExamRecords[index] = updated;
+                }
+                
+                // Re-render with current filters
+                filterRecords();
+                editingRecordId = null;
+                
+            } catch (error) {
+                console.error('Error updating record:', error);
+                alert('更新失敗');
+            }
+        }
+
+        async function deleteRecord(id) {
+            if (!confirm('確定要刪除這筆紀錄嗎？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/results/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete record');
+                }
+                
+                // Remove from local data
+                allExamRecords = allExamRecords.filter(r => r.id !== id);
+                
+                // Update dropdown filters
+                const users = [...new Set(allExamRecords.map(r => r.username))].sort();
+                const units = [...new Set(allExamRecords.map(r => r.unit_number))].sort((a, b) => parseInt(a) - parseInt(b));
+                
+                const filterUser = document.getElementById('filterUser');
+                const currentUserFilter = filterUser.value;
+                filterUser.innerHTML = `<option value="">全部用戶</option>` + 
+                    users.map(u => `<option value="${u}"${u === currentUserFilter ? ' selected' : ''}>${u}</option>`).join('');
+                
+                const filterUnit = document.getElementById('filterUnit');
+                const currentUnitFilter = filterUnit.value;
+                filterUnit.innerHTML = `<option value="">全部Unit</option>` + 
+                    units.map(u => `<option value="${u}"${u === currentUnitFilter ? ' selected' : ''}>${u}</option>`).join('');
+                
+                // Re-render with current filters
+                filterRecords();
+                loadUserStats();  // Refresh stats
+                
+            } catch (error) {
+                console.error('Error deleting record:', error);
+                alert('刪除失敗');
             }
         }
 
