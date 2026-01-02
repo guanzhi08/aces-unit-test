@@ -535,6 +535,21 @@ async def read_root():
     return FileResponse("index.html")
 
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/admin")
+async def read_admin():
+    """Serve the admin page with records management button."""
+    with open("index.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    # Inject admin button
+    admin_button = '<button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>'
+    html_content = html_content.replace("<!-- ADMIN_BUTTON_PLACEHOLDER -->", admin_button)
+    
+    return HTMLResponse(content=html_content)
+
+
 @app.get("/{filename}")
 async def read_file(filename: str):
     """Serve static files like CSV and HTML."""
