@@ -311,6 +311,7 @@
             margin-bottom: 15px;
             padding-bottom: 15px;
             border-bottom: 1px solid #eee;
+            flex-wrap: wrap;
         }
         .user-section input {
             padding: 10px 15px;
@@ -333,6 +334,12 @@
         .stats-badge.warning {
             background-color: #fff3e0;
             color: #ef6c00;
+        }
+        @media (max-width: 600px) {
+            .stats-badge {
+                flex-basis: 100%;
+                text-align: center;
+            }
         }
         .score-curve-container {
             background-color: #fff;
