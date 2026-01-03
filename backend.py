@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import os
+import hashlib
+import secrets
 
 # Database configuration
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -102,6 +104,19 @@ def init_db():
                 exam_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admin_settings (
+                id SERIAL PRIMARY KEY,
+                setting_key TEXT UNIQUE NOT NULL,
+                setting_value TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admin_sessions (
+                token TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
     else:
         # SQLite syntax
         cursor.execute('''
@@ -116,6 +131,36 @@ def init_db():
                 exam_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admin_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                setting_key TEXT UNIQUE NOT NULL,
+                setting_value TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admin_sessions (
+                token TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+    
+    # Set default admin password if not exists (default: 'admin123')
+    default_password_hash = hashlib.sha256('admin123'.encode()).hexdigest()
+    try:
+        if USE_POSTGRES:
+            cursor.execute('''
+                INSERT INTO admin_settings (setting_key, setting_value)
+                VALUES ('admin_password', %s)
+                ON CONFLICT (setting_key) DO NOTHING
+            ''', (default_password_hash,))
+        else:
+            cursor.execute('''
+                INSERT OR IGNORE INTO admin_settings (setting_key, setting_value)
+                VALUES ('admin_password', ?)
+            ''', (default_password_hash,))
+    except Exception:
+        pass  # Already exists
     
     conn.commit()
     conn.close()
@@ -537,15 +582,262 @@ async def read_root():
 
 from fastapi.responses import HTMLResponse
 
+
+class AdminLogin(BaseModel):
+    password: str
+
+
+class AdminPasswordChange(BaseModel):
+    old_password: str
+    new_password: str
+
+
+def verify_admin_token(token: str) -> bool:
+    """Verify if admin session token is valid."""
+    if not token:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql('SELECT token FROM admin_sessions WHERE token = ?'), (token,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+
+@app.post("/api/admin/login")
+async def admin_login(login: AdminLogin):
+    """Verify admin password and return session token."""
+    password_hash = hashlib.sha256(login.password.encode()).hexdigest()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql("SELECT setting_value FROM admin_settings WHERE setting_key = 'admin_password'"))
+    result = cursor.fetchone()
+    
+    if not result or result['setting_value'] != password_hash:
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid password")
+    
+    # Generate session token
+    token = secrets.token_urlsafe(32)
+    cursor.execute(sql('INSERT INTO admin_sessions (token) VALUES (?)'), (token,))
+    conn.commit()
+    conn.close()
+    
+    return {"success": True, "token": token}
+
+
+@app.post("/api/admin/verify")
+async def admin_verify(token: str = ""):
+    """Verify if session token is valid."""
+    if verify_admin_token(token):
+        return {"valid": True}
+    raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+@app.post("/api/admin/logout")
+async def admin_logout(token: str = ""):
+    """Invalidate admin session token."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql('DELETE FROM admin_sessions WHERE token = ?'), (token,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+
+@app.post("/api/admin/change-password")
+async def admin_change_password(data: AdminPasswordChange, token: str = ""):
+    """Change admin password."""
+    if not verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    old_hash = hashlib.sha256(data.old_password.encode()).hexdigest()
+    new_hash = hashlib.sha256(data.new_password.encode()).hexdigest()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql("SELECT setting_value FROM admin_settings WHERE setting_key = 'admin_password'"))
+    result = cursor.fetchone()
+    
+    if not result or result['setting_value'] != old_hash:
+        conn.close()
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    cursor.execute(sql("UPDATE admin_settings SET setting_value = ? WHERE setting_key = 'admin_password'"), (new_hash,))
+    conn.commit()
+    conn.close()
+    
+    return {"success": True, "message": "Password changed successfully"}
+
+
 @app.get("/admin")
 async def read_admin():
-    """Serve the admin page with records management button."""
+    """Serve the admin login page."""
+    login_html = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - ACES</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        h2 { color: #333; margin-bottom: 30px; }
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0 20px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #9C27B0;
+        }
+        button {
+            background-color: #9C27B0;
+            color: white;
+            padding: 12px 40px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover { background-color: #7B1FA2; }
+        .error {
+            color: #f44336;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>🔐 Admin Login</h2>
+        <form onsubmit="return handleLogin(event)">
+            <input type="password" id="password" placeholder="Enter admin password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p class="error" id="error">Invalid password</p>
+    </div>
+    <script>
+        // Check if already logged in
+        const token = localStorage.getItem('adminToken');
+        if (token) {
+            verifyAndRedirect(token);
+        }
+        
+        async function verifyAndRedirect(token) {
+            try {
+                const resp = await fetch('/api/admin/verify?token=' + encodeURIComponent(token), { method: 'POST' });
+                if (resp.ok) {
+                    window.location.href = '/admin/dashboard';
+                } else {
+                    localStorage.removeItem('adminToken');
+                }
+            } catch (e) {
+                localStorage.removeItem('adminToken');
+            }
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('error');
+            errorEl.style.display = 'none';
+            
+            try {
+                const resp = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                });
+                
+                if (resp.ok) {
+                    const data = await resp.json();
+                    localStorage.setItem('adminToken', data.token);
+                    window.location.href = '/admin/dashboard';
+                } else {
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Login failed. Please try again.';
+                errorEl.style.display = 'block';
+            }
+            return false;
+        }
+    </script>
+</body>
+</html>
+'''
+    return HTMLResponse(content=login_html)
+
+
+@app.get("/admin/dashboard")
+async def read_admin_dashboard():
+    """Serve the admin dashboard page with records management button."""
     with open("index.html", "r", encoding="utf-8") as f:
         html_content = f.read()
     
-    # Inject admin button
-    admin_button = '<button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>'
+    # Inject admin button and logout functionality
+    admin_button = '''<button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
+            <button onclick="adminLogout()" style="background-color: #f44336;">登出</button>'''
     html_content = html_content.replace("<!-- ADMIN_BUTTON_PLACEHOLDER -->", admin_button)
+    
+    # Inject admin verification script
+    admin_script = '''
+    <script>
+        // Verify admin token on page load
+        (async function() {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                window.location.href = '/admin';
+                return;
+            }
+            try {
+                const resp = await fetch('/api/admin/verify?token=' + encodeURIComponent(token), { method: 'POST' });
+                if (!resp.ok) {
+                    localStorage.removeItem('adminToken');
+                    window.location.href = '/admin';
+                }
+            } catch (e) {
+                localStorage.removeItem('adminToken');
+                window.location.href = '/admin';
+            }
+        })();
+        
+        async function adminLogout() {
+            const token = localStorage.getItem('adminToken');
+            if (token) {
+                await fetch('/api/admin/logout?token=' + encodeURIComponent(token), { method: 'POST' });
+            }
+            localStorage.removeItem('adminToken');
+            window.location.href = '/admin';
+        }
+    </script>
+</body>'''
+    html_content = html_content.replace("</body>", admin_script)
     
     return HTMLResponse(content=html_content)
 
