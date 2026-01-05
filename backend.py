@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os
 import hashlib
 import secrets
@@ -79,10 +79,37 @@ def format_exam_date(exam_date):
     """Format exam_date to string consistently."""
     if exam_date is None:
         return ""
+    # Target timezone: UTC+8
+    target_tz = timezone(timedelta(hours=8))
+
+    # If value is a string, try to parse it first
     if isinstance(exam_date, str):
-        return exam_date[:16] if len(exam_date) >= 16 else exam_date
+        # Try ISO first, then common formats; fall back to trimming
+        dt = None
+        try:
+            dt = datetime.fromisoformat(exam_date)
+        except Exception:
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'):
+                try:
+                    dt = datetime.strptime(exam_date, fmt)
+                    break
+                except Exception:
+                    dt = None
+        if dt is None:
+            return exam_date[:16] if len(exam_date) >= 16 else exam_date
+        # Assume naive datetimes are UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(target_tz).strftime('%Y-%m-%d %H:%M')
+
     # For datetime objects (PostgreSQL returns datetime)
-    return exam_date.strftime('%Y-%m-%d %H:%M')
+    if isinstance(exam_date, datetime):
+        dt = exam_date
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(target_tz).strftime('%Y-%m-%d %H:%M')
+
+    return str(exam_date)
 
 
 def init_db():
@@ -985,6 +1012,19 @@ async def read_admin_dashboard():
                         if (examAreaEl) examAreaEl.style.display = '';
                     } catch (e) {}
 
+                    // Ensure ranking controls (Unit selector + ranking button) are visible for admin
+                    try {
+                        const showIds = ['labelUnit','unitNumber','rankingBtn'];
+                        showIds.forEach(id => {
+                            try {
+                                const el = document.getElementById(id);
+                                if (!el) return;
+                                if (el.tagName === 'SELECT' || el.tagName === 'DIV') el.style.display = '';
+                                else el.style.display = 'inline-block';
+                            } catch (e) {}
+                        });
+                    } catch (e) {}
+
                     // Attach explicit handlers to injected admin buttons to ensure they call the page functions
                     try {
                         const rBtn = document.getElementById('recordsBtn');
@@ -1124,7 +1164,7 @@ async def admin_list_users(token: str = ""):
     cursor.execute(sql('SELECT id, username, created_at FROM users ORDER BY username'))
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": row['id'], "username": row['username'], "created_at": row['created_at']} for row in rows]
+    return [{"id": row['id'], "username": row['username'], "created_at": format_exam_date(row['created_at'])} for row in rows]
 
 
 @app.post("/api/admin/users/delete")
