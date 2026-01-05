@@ -542,10 +542,10 @@
             </select>
             <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
             <button onclick="startExam()" id="startBtn">模擬考</button>
+            <button onclick="resetExam()" id="resetBtn">重置</button>
             <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
-            <button onclick="showUnitRanking()" id="rankingBtn" style="background:#5e35b1; margin-left:6px; display:none;">單元排行</button>
-            <!-- ADMIN_BUTTON_PLACEHOLDER -->
-            <button onclick="resetExam()" id="resetBtn">重置</button>            
+            <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">單元排行</button>
+            <!-- ADMIN_BUTTON_PLACEHOLDER -->            
         </div>
     </div>
 
@@ -655,8 +655,17 @@
             localStorage.removeItem('acesUsername');
             localStorage.removeItem('acesAuthenticated');
             document.getElementById('username').value = '';
-            document.getElementById('loginStatus').textContent = '';
-            document.getElementById('loginStatus').className = 'stats-badge warning';
+            const loginStatusEl = document.getElementById('loginStatus');
+            if (loginStatusEl) {
+                loginStatusEl.textContent = '';
+                loginStatusEl.style.display = 'none';
+                loginStatusEl.className = '';
+            }
+            const userStatsEl = document.getElementById('userStats');
+            if (userStatsEl) {
+                userStatsEl.classList.add('hidden');
+                userStatsEl.textContent = '';
+            }
             // Show login inputs
             document.getElementById('loginControls').style.display = 'flex';
             document.getElementById('logoutBtn').style.display = 'none';
