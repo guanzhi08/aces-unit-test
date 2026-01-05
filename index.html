@@ -324,6 +324,19 @@
             outline: none;
             border-color: #4CAF50;
         }
+        /* New inputs for create account to match styling */
+        .user-section-input {
+            padding: 10px 12px;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            width: 180px;
+        }
+        .user-section-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
         .stats-badge {
             background-color: #e8f5e9;
             padding: 8px 15px;
@@ -486,16 +499,40 @@
     
     <div class="controls">
         <div class="user-section">
-            <label for="username">👤 名字:</label>
-            <input type="text" id="username" placeholder="輸入名字..." onchange="loadUserStats()">
+            <div id="loginControls" style="display:flex; align-items:center; gap:8px;">
+                <label for="username">👤 名字:</label>
+                <input type="text" id="username" placeholder="輸入名字..." onchange="loadUserStats()">
+                <label for="loginPassword">🔒 密碼:</label>
+                <input class="user-section-input" type="password" id="loginPassword" placeholder="登入密碼 (選填)" />
+                <button id="loginBtn" onclick="login()" style="background:#4CAF50; margin-left:6px;">登入</button>
+                <button id="createAcctBtn" onclick="toggleCreateAcct()" style="background:#1976D2;">建立帳號</button>
+            </div>            
+            <span id="loginStatus" class="stats-badge" style="margin-left:8px; display:none;">訪客</span>
             <span id="userStats" class="stats-badge hidden"></span>
+            <button id="logoutBtn" onclick="logout()" style="background:#f44336; display:none; margin-left:8px;">登出</button>
+        </div>
+
+        <div id="createAccountArea" class="hidden" style="margin-top:12px;">
+            <div class="controls" style="padding:12px;">
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <input class="user-section-input" type="text" id="newUsername" placeholder="新帳號名稱" />
+                    <input class="user-section-input" type="password" id="newPassword" placeholder="密碼" />
+                    <input class="user-section-input" type="password" id="newPasswordConfirm" placeholder="再次輸入密碼" />
+                    <button class="" onclick="createAccount()">送出</button>
+                    <button class="" onclick="toggleCreateAcct(false)" style="background:#9e9e9e;">取消</button>
+                </div>
+                <div style="margin-top:8px;">
+                    <span id="createAcctError" class="" style="color:#f44336; display:none;"></span>
+                    <span id="createAcctSuccess" class="" style="color:#4caf50; display:none;"></span>
+                </div>
+            </div>
         </div>
         <div>
-            <label for="unitNumber">Unit:</label>
+            <label id="labelUnit" for="unitNumber">Unit:</label>
             <select id="unitNumber" onchange="loadUserStats()">
                 <option value="">Loading...</option>
             </select>
-            <label for="questionCount">題數:</label>
+            <label id="labelQuestionCount" for="questionCount">題數:</label>
             <select id="questionCount">
                 <option value="5" selected>5</option>
                 <option value="10">10</option>
@@ -532,6 +569,9 @@
                 document.getElementById('username').value = savedUsername;
                 loadUserStats();
             }
+            // Initialize exam UI visibility based on authentication
+            const auth = localStorage.getItem('acesAuthenticated') === '1';
+            updateAuthUI(auth);
         });
 
         // Save username to localStorage when changed
@@ -542,23 +582,166 @@
             }
         }
 
-        // Load user statistics from backend
+        // Toggle create account UI
+        function toggleCreateAcct(show) {
+            const el = document.getElementById('createAccountArea');
+            const isHidden = el.classList.contains('hidden');
+            if (typeof show === 'undefined') show = isHidden;
+            if (show) el.classList.remove('hidden'); else el.classList.add('hidden');
+            // clear messages
+            document.getElementById('createAcctError').style.display = 'none';
+            document.getElementById('createAcctSuccess').style.display = 'none';
+        }
+
+        // Simple login handler: saves username and refreshes stats
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const statusEl = document.getElementById('loginStatus');
+            if (!username) {
+                alert('請先輸入名字');
+                return;
+            }
+            try {
+                const resp = await fetch(`${API_BASE}/api/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, password: password })
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    // Login successful
+                    updateAuthUI(true);
+                    localStorage.setItem('acesUsername', data.username);
+                    localStorage.setItem('acesAuthenticated', '1');
+                    document.getElementById('username').value = data.username;
+                    statusEl.textContent = `已登入: ${data.username}`;
+                    statusEl.style.display = 'inline-block';
+                    statusEl.className = 'stats-badge';
+                    document.getElementById('loginPassword').value = '';
+                    // Hide login inputs and show logout button
+                    document.getElementById('loginControls').style.display = 'none';
+                    document.getElementById('logoutBtn').style.display = 'inline-block';
+                    document.getElementById('createAcctBtn').style.display = 'none';
+                    loadUserStats();
+                } else {
+                    // Login failed, treat as guest
+                    updateAuthUI(false);
+                    localStorage.removeItem('acesUsername');
+                    localStorage.removeItem('acesAuthenticated');
+                    statusEl.textContent = '訪客';
+                    statusEl.style.display = 'inline-block';
+                    statusEl.className = 'stats-badge warning';
+                    document.getElementById('loginPassword').value = '';
+                    loadUserStats();
+                }
+            } catch (e) {
+                console.error('Login error', e);
+                updateAuthUI(false);
+                statusEl.textContent = '訪客';
+                statusEl.style.display = 'inline-block';
+                statusEl.className = 'stats-badge warning';
+            }
+        }
+
+        function logout() {
+            // Clear local login state
+            localStorage.removeItem('acesUsername');
+            localStorage.removeItem('acesAuthenticated');
+            document.getElementById('username').value = '';
+            document.getElementById('loginStatus').textContent = '訪客';
+            document.getElementById('loginStatus').className = 'stats-badge warning';
+            // Show login inputs
+            document.getElementById('loginControls').style.display = 'flex';
+            document.getElementById('logoutBtn').style.display = 'none';
+            document.getElementById('createAcctBtn').style.display = 'inline-block';
+            // Hide exam-related UI for guests
+            updateAuthUI(false);
+            loadUserStats();
+        }
+
+        // Show or hide exam-related UI based on whether the user is authenticated
+        function updateAuthUI(authenticated) {
+            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea'];
+            idsToShow.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (authenticated) {
+                    // Restore default display
+                    if (el.tagName === 'SELECT' || el.tagName === 'DIV') el.style.display = '';
+                    else el.style.display = 'inline-block';
+                } else {
+                    el.style.display = 'none';
+                    // clear exam area when hiding
+                    if (id === 'examArea') el.innerHTML = '';
+                }
+            });
+        }
+
+        // Create account via backend API
+        async function createAccount() {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const passwordConfirm = document.getElementById('newPasswordConfirm').value;
+            const errEl = document.getElementById('createAcctError');
+            const okEl = document.getElementById('createAcctSuccess');
+            errEl.style.display = 'none'; okEl.style.display = 'none';
+
+            if (!username || !password) {
+                errEl.textContent = '請輸入帳號與密碼'; errEl.style.display = 'inline'; return;
+            }
+            if (password !== passwordConfirm) {
+                errEl.textContent = '兩次輸入的密碼不相符'; errEl.style.display = 'inline'; return;
+            }
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/users/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, password: password })
+                });
+
+                if (resp.ok) {
+                    okEl.textContent = '帳號建立成功'; okEl.style.display = 'inline';
+                    // Optionally populate username field and save
+                    document.getElementById('username').value = username;
+                    saveUsername();
+                    setTimeout(() => toggleCreateAcct(false), 1200);
+                } else {
+                    const json = await resp.json();
+                    errEl.textContent = json.detail || '建立失敗'; errEl.style.display = 'inline';
+                }
+            } catch (e) {
+                errEl.textContent = '無法連線到後端'; errEl.style.display = 'inline';
+            }
+        }
+
+        // Load user statistics from backend (only show when user is authenticated)
         async function loadUserStats() {
             const username = document.getElementById('username').value.trim();
             const unitNumber = document.getElementById('unitNumber').value;
             saveUsername();
-            
-            if (!username) {
-                document.getElementById('userStats').classList.add('hidden');
+
+            const statsEl = document.getElementById('userStats');
+
+            // Only show userStats when authenticated
+            const authenticated = localStorage.getItem('acesAuthenticated') === '1';
+            if (!authenticated) {
+                statsEl.classList.add('hidden');
                 return;
             }
-            
+
+            if (!username) {
+                statsEl.classList.add('hidden');
+                return;
+            }
+
             try {
                 const response = await fetch(`${API_BASE}/api/stats/${encodeURIComponent(username)}?unit=${encodeURIComponent(unitNumber)}`);
                 if (response.ok) {
                     const stats = await response.json();
-                    const statsEl = document.getElementById('userStats');
-                    
+
                     if (stats.total_exams > 0) {
                         statsEl.textContent = `📊 Unit ${unitNumber}: ${stats.total_exams} 次 | 平均: ${stats.average_score}% | 最高: ${stats.best_score}%`;
                         statsEl.className = stats.average_score >= 80 ? 'stats-badge' : 'stats-badge warning';
@@ -568,10 +751,13 @@
                         statsEl.className = 'stats-badge';
                         statsEl.classList.remove('hidden');
                     }
+                } else {
+                    // If backend returns non-ok, hide stats to avoid leaking info
+                    statsEl.classList.add('hidden');
                 }
             } catch (error) {
                 console.log('Backend not available, running in offline mode');
-                document.getElementById('userStats').classList.add('hidden');
+                statsEl.classList.add('hidden');
             }
         }
 

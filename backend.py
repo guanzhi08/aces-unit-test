@@ -117,6 +117,15 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        # Users table for account creation
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
     else:
         # SQLite syntax
         cursor.execute('''
@@ -129,6 +138,15 @@ def init_db():
                 correct_count INTEGER NOT NULL,
                 total_questions INTEGER NOT NULL,
                 exam_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        # Users table for account creation
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         cursor.execute('''
@@ -592,6 +610,16 @@ class AdminPasswordChange(BaseModel):
     new_password: str
 
 
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 def verify_admin_token(token: str) -> bool:
     """Verify if admin session token is valid."""
     if not token:
@@ -602,6 +630,118 @@ def verify_admin_token(token: str) -> bool:
     result = cursor.fetchone()
     conn.close()
     return result is not None
+
+
+@app.post("/api/users/create")
+async def create_user(data: CreateUserRequest):
+    """Create a new user with username and password."""
+    username = data.username.strip()
+    password = data.password
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(sql('INSERT INTO users (username, password_hash) VALUES (?, ?)'), (username, password_hash))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Username already exists or invalid")
+
+    conn.close()
+    return {"success": True, "username": username}
+
+
+@app.post("/api/users/login")
+async def user_login(data: LoginRequest):
+    """Verify a user's username and password."""
+    username = data.username.strip()
+    password = data.password
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql('SELECT id, username, password_hash FROM users WHERE username = ?'), (username,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if row['password_hash'] != password_hash:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Return basic user info (no session token yet)
+    return {"success": True, "username": username}
+
+
+@app.get("/create-user")
+async def create_user_page():
+    """Serve a simple HTML page to create user accounts."""
+    html = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - ACES</title>
+    <style>
+        body { font-family: Arial, sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; background:#f7f7f7; }
+        .card { background:white; padding:24px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.08); width:320px; }
+        input { width:100%; padding:10px; margin:8px 0; border:1px solid #ddd; border-radius:6px; }
+        button { width:100%; padding:10px; background:#2196F3; color:white; border:none; border-radius:6px; cursor:pointer; }
+        .error { color:#f44336; display:none; }
+        .success { color:#4caf50; display:none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Create Account</h2>
+        <form onsubmit="return submitForm(event)">
+            <input id="username" placeholder="Username" required />
+            <input id="password" type="password" placeholder="Password" required />
+            <button type="submit">Create</button>
+        </form>
+        <p class="error" id="error"></p>
+        <p class="success" id="success">Account created successfully. You may close this page.</p>
+    </div>
+    <script>
+        async function submitForm(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('error');
+            const successEl = document.getElementById('success');
+            errorEl.style.display = 'none';
+            successEl.style.display = 'none';
+            try {
+                const resp = await fetch('/api/users/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (resp.ok) {
+                    successEl.style.display = 'block';
+                } else {
+                    const json = await resp.json();
+                    errorEl.textContent = json.detail || 'Failed to create account';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Network error';
+                errorEl.style.display = 'block';
+            }
+            return false;
+        }
+    </script>
+</body>
+</html>
+'''
+    return HTMLResponse(content=html)
 
 
 @app.post("/api/admin/login")
@@ -801,7 +941,8 @@ async def read_admin_dashboard():
         html_content = f.read()
     
     # Inject admin button and logout functionality
-    admin_button = '''<button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
+        admin_button = '''<button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
+            <button onclick="showUserManagement()" id="userMgmtBtn" style="background-color: #2196F3;">使用者管理</button>
             <button onclick="adminLogout()" style="background-color: #f44336;">登出</button>'''
     html_content = html_content.replace("<!-- ADMIN_BUTTON_PLACEHOLDER -->", admin_button)
     
@@ -820,6 +961,15 @@ async def read_admin_dashboard():
                 if (!resp.ok) {
                     localStorage.removeItem('adminToken');
                     window.location.href = '/admin';
+                } else {
+                    // Hide non-admin controls when viewing as admin
+                    const hideIds = ['unitNumber','questionCount','showTableBtn','startBtn','historyBtn','resetBtn'];
+                    hideIds.forEach(id => {
+                        try {
+                            const el = document.getElementById(id);
+                            if (el) el.style.display = 'none';
+                        } catch (e) {}
+                    });
                 }
             } catch (e) {
                 localStorage.removeItem('adminToken');
@@ -835,11 +985,106 @@ async def read_admin_dashboard():
             localStorage.removeItem('adminToken');
             window.location.href = '/admin';
         }
+        
+        // User management: fetch list, delete, reset password
+        async function showUserManagement() {
+            const token = localStorage.getItem('adminToken');
+            try {
+                const resp = await fetch('/api/admin/users?token=' + encodeURIComponent(token));
+                if (!resp.ok) throw new Error('Failed to fetch users');
+                const users = await resp.json();
+                // Build simple modal
+                const modalHtml = `
+                    <div id="adminUserModal" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;">
+                      <div style="background:white;padding:20px;border-radius:8px;max-width:800px;width:90%;">
+                        <h3>使用者管理</h3>
+                        <table style="width:100%;border-collapse:collapse;">
+                          <thead><tr><th>Id</th><th>Username</th><th>Created</th><th>Action</th></tr></thead>
+                          <tbody>${users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.created_at || ''}</td><td><button onclick="adminDeleteUser(${u.id})" style="background:#f44336;">刪除</button> <button onclick="adminResetPassword(${u.id})" style="background:#2196F3;">重設密碼</button></td></tr>`).join('')}</tbody>
+                        </table>
+                        <div style="text-align:right;margin-top:12px;"><button onclick="document.getElementById('adminUserModal').remove()">關閉</button></div>
+                      </div>
+                    </div>
+                `;
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = modalHtml;
+                document.body.appendChild(wrapper);
+            } catch (e) {
+                alert('無法取得使用者列表');
+            }
+        }
+
+        async function adminDeleteUser(id) {
+            if (!confirm('確定要刪除此使用者嗎?')) return;
+            const token = localStorage.getItem('adminToken');
+            try {
+                const resp = await fetch('/api/admin/users/delete?user_id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(token), { method: 'POST' });
+                if (resp.ok) {
+                    alert('已刪除');
+                    document.getElementById('adminUserModal').remove();
+                    showUserManagement();
+                } else {
+                    alert('刪除失敗');
+                }
+            } catch (e) { alert('刪除錯誤'); }
+        }
+
+        async function adminResetPassword(id) {
+            const newPass = prompt('輸入新密碼 (留空使用預設 admin123):');
+            const token = localStorage.getItem('adminToken');
+            const passParam = encodeURIComponent(newPass || 'admin123');
+            try {
+                const resp = await fetch('/api/admin/users/reset-password?user_id=' + encodeURIComponent(id) + '&new_password=' + passParam + '&token=' + encodeURIComponent(token), { method: 'POST' });
+                if (resp.ok) { alert('密碼已重設'); } else { alert('重設失敗'); }
+            } catch (e) { alert('重設錯誤'); }
+        }
     </script>
 </body>'''
     html_content = html_content.replace("</body>", admin_script)
     
     return HTMLResponse(content=html_content)
+
+
+def require_admin(token: str):
+    if not verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+@app.get("/api/admin/users")
+async def admin_list_users(token: str = ""):
+    """Return list of users (username, created_at). Admin only."""
+    require_admin(token)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql('SELECT id, username, created_at FROM users ORDER BY username'))
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": row['id'], "username": row['username'], "created_at": row['created_at']} for row in rows]
+
+
+@app.post("/api/admin/users/delete")
+async def admin_delete_user(user_id: int, token: str = ""):
+    """Delete a user by id. Admin only."""
+    require_admin(token)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql('DELETE FROM users WHERE id = ?'), (user_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True, "id": user_id}
+
+
+@app.post("/api/admin/users/reset-password")
+async def admin_reset_password(user_id: int, new_password: str = "admin123", token: str = ""):
+    """Reset user's password to a provided password (default 'admin123'). Admin only."""
+    require_admin(token)
+    new_hash = hashlib.sha256(new_password.encode()).hexdigest()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql('UPDATE users SET password_hash = ? WHERE id = ?'), (new_hash, user_id))
+    conn.commit()
+    conn.close()
+    return {"success": True, "id": user_id}
 
 
 @app.get("/{filename}")
