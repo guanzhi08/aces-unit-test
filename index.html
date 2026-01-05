@@ -543,6 +543,7 @@
             <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
             <button onclick="startExam()" id="startBtn">模擬考</button>
             <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
+            <button onclick="showUnitRanking()" id="rankingBtn" style="background:#5e35b1; margin-left:6px; display:none;">單元排行</button>
             <!-- ADMIN_BUTTON_PLACEHOLDER -->
             <button onclick="resetExam()" id="resetBtn">重置</button>            
         </div>
@@ -666,7 +667,7 @@
 
         // Show or hide exam-related UI based on whether the user is authenticated
         function updateAuthUI(authenticated) {
-            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea'];
+            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea','rankingBtn'];
             idsToShow.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -680,6 +681,61 @@
                     if (id === 'examArea') el.innerHTML = '';
                 }
             });
+        }
+
+        // Show ranking (average score) for the selected unit
+        async function showUnitRanking() {
+            const unitNumber = document.getElementById('unitNumber').value;
+            if (!unitNumber) {
+                alert('請先選擇 Unit');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/all-results`);
+                if (!response.ok) throw new Error('無法取得紀錄');
+
+                const all = await response.json();
+                // Filter by unit
+                const filtered = all.filter(r => String(r.unit_number) === String(unitNumber));
+                if (filtered.length === 0) {
+                    alert(`Unit ${unitNumber} 尚無紀錄`);
+                    return;
+                }
+
+                // Aggregate by username
+                const byUser = {};
+                filtered.forEach(r => {
+                    const u = r.username || 'Unknown';
+                    if (!byUser[u]) byUser[u] = { total: 0, count: 0, best: 0 };
+                    byUser[u].total += r.score;
+                    byUser[u].count += 1;
+                    byUser[u].best = Math.max(byUser[u].best, r.score);
+                });
+
+                const rows = Object.keys(byUser).map(u => ({
+                    username: u,
+                    avg: +(byUser[u].total / byUser[u].count).toFixed(1),
+                    attempts: byUser[u].count,
+                    best: byUser[u].best
+                }));
+
+                // Sort by average desc, then best desc
+                rows.sort((a, b) => b.avg - a.avg || b.best - a.best);
+
+                // Build HTML table
+                let html = `<div class="records-container"><h3>🏆 Unit ${unitNumber} 排行</h3>`;
+                html += `<div class="table-wrapper"><table class="records-table"><thead><tr><th>排行</th><th>用戶</th><th>平均分數</th><th>最高分</th><th>次數</th></tr></thead><tbody>`;
+                rows.forEach((r, idx) => {
+                    html += `<tr><td>${idx+1}</td><td>${r.username}</td><td>${r.avg}%</td><td>${r.best}%</td><td>${r.attempts}</td></tr>`;
+                });
+                html += `</tbody></table></div><div style="text-align:center;margin-top:12px;"><button onclick="resetExam()" style="background-color:#4CAF50;color:#fff;padding:10px 20px;border-radius:4px;">關閉</button></div></div>`;
+
+                document.getElementById('examArea').innerHTML = html;
+            } catch (err) {
+                console.error('Error loading ranking', err);
+                alert('無法載入排行，請確認後端服務已啟動');
+            }
         }
 
         // Create account via backend API
