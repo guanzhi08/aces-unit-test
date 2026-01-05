@@ -314,11 +314,13 @@
             flex-wrap: wrap;
         }
         .user-section input {
-            padding: 10px 15px;
+            padding: 8px 10px;
             font-size: 16px;
             border: 2px solid #ddd;
             border-radius: 4px;
-            width: 200px;
+            width: 140px;
+            max-width: 40vw;
+            box-sizing: border-box;
         }
         .user-section input:focus {
             outline: none;
@@ -499,15 +501,15 @@
     
     <div class="controls">
         <div class="user-section">
-            <div id="loginControls" style="display:flex; align-items:center; gap:8px;">
+            <div id="loginControls">
                 <label for="username">👤 名字:</label>
                 <input type="text" id="username" placeholder="輸入名字..." onchange="loadUserStats()">
                 <label for="loginPassword">🔒 密碼:</label>
-                <input class="user-section-input" type="password" id="loginPassword" placeholder="登入密碼 (選填)" />
+                <input class="user-section-input" type="password" id="loginPassword" placeholder="登入密碼" />
                 <button id="loginBtn" onclick="login()" style="background:#4CAF50; margin-left:6px;">登入</button>
                 <button id="createAcctBtn" onclick="toggleCreateAcct()" style="background:#1976D2;">建立帳號</button>
             </div>            
-            <span id="loginStatus" class="stats-badge" style="margin-left:8px; display:none;">訪客</span>
+            <span id="loginStatus" class="stats-badge" style="margin-left:8px; display:none;"></span>
             <span id="userStats" class="stats-badge hidden"></span>
             <button id="logoutBtn" onclick="logout()" style="background:#f44336; display:none; margin-left:8px;">登出</button>
         </div>
@@ -626,20 +628,21 @@
                     document.getElementById('createAcctBtn').style.display = 'none';
                     loadUserStats();
                 } else {
-                    // Login failed, treat as guest
+                    // Login failed — show error and keep user on login controls
                     updateAuthUI(false);
-                    localStorage.removeItem('acesUsername');
-                    localStorage.removeItem('acesAuthenticated');
-                    statusEl.textContent = '訪客';
+                    statusEl.textContent = '登入失敗：帳號或密碼錯誤';
                     statusEl.style.display = 'inline-block';
                     statusEl.className = 'stats-badge warning';
                     document.getElementById('loginPassword').value = '';
-                    loadUserStats();
+                    // Keep login controls visible for retry
+                    document.getElementById('loginControls').style.display = 'flex';
+                    document.getElementById('logoutBtn').style.display = 'none';
+                    // Do not clear saved username here; user may want to retry
                 }
             } catch (e) {
                 console.error('Login error', e);
                 updateAuthUI(false);
-                statusEl.textContent = '訪客';
+                statusEl.textContent = '';
                 statusEl.style.display = 'inline-block';
                 statusEl.className = 'stats-badge warning';
             }
@@ -650,7 +653,7 @@
             localStorage.removeItem('acesUsername');
             localStorage.removeItem('acesAuthenticated');
             document.getElementById('username').value = '';
-            document.getElementById('loginStatus').textContent = '訪客';
+            document.getElementById('loginStatus').textContent = '';
             document.getElementById('loginStatus').className = 'stats-badge warning';
             // Show login inputs
             document.getElementById('loginControls').style.display = 'flex';
