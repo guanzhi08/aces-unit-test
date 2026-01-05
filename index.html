@@ -743,6 +743,9 @@
 
                 let html = `<div class="records-container"><h3>🏆 Unit ${unitNumber} 排行</h3>`;
 
+                // Add temporary highlight style for current user (font color)
+                html += `<style>.rank-highlight td{color:#2196F3;font-weight:700;} .records-table td{vertical-align:middle;}</style>`;
+
                 // Build a table for each category
                 ['5','10','ALL'].forEach(cat => {
                     const list = categories[cat] || [];
@@ -753,8 +756,11 @@
                         return;
                     }
                     html += `<div class="table-wrapper"><table class="records-table"><thead><tr><th>排行</th><th>用戶</th><th>平均分數</th><th>最高分</th><th>次數</th></tr></thead><tbody>`;
+                    const currentUser = (localStorage.getItem('acesUsername') || '').trim();
                     rows.forEach((r, idx) => {
-                        html += `<tr><td>${idx+1}</td><td>${r.username}</td><td>${r.avg}%</td><td>${r.best}%</td><td>${r.attempts}</td></tr>`;
+                        const medal = idx === 0 ? ' 🥇' : (idx === 1 ? ' 🥈' : (idx === 2 ? ' 🥉' : ''));
+                        const highlightClass = currentUser && r.username === currentUser ? ' rank-highlight' : '';
+                        html += `<tr class="${highlightClass}"><td>${idx+1}${medal}</td><td>${r.username}</td><td>${r.avg}%</td><td>${r.best}%</td><td>${r.attempts}</td></tr>`;
                     });
                     html += `</tbody></table></div>`;
                 });
