@@ -941,8 +941,8 @@ async def read_admin_dashboard():
         html_content = f.read()
     
     # Inject admin button and logout functionality
-        admin_button = '''<button onclick="showExamRecords()" id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
-            <button onclick="showUserManagement()" id="userMgmtBtn" style="background-color: #2196F3;">使用者管理</button>
+        admin_button = '''<button id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
+            <button id="userMgmtBtn" style="background-color: #2196F3;">使用者管理</button>
             <button onclick="adminLogout()" style="background-color: #f44336;">登出</button>'''
     html_content = html_content.replace("<!-- ADMIN_BUTTON_PLACEHOLDER -->", admin_button)
     
@@ -970,6 +970,59 @@ async def read_admin_dashboard():
                             if (el) el.style.display = 'none';
                         } catch (e) {}
                     });
+                    // Also hide normal user login inputs/buttons so the admin view doesn't show them
+                    const hideLoginIds = ['loginControls','loginBtn','createAcctBtn','loginPassword','username','logoutBtn','createAccountArea','loginStatus','userStats', 'labelUnit', 'labelQuestionCount'];
+                    hideLoginIds.forEach(id => {
+                        try {
+                            const el = document.getElementById(id);
+                            if (el) el.style.display = 'none';
+                        } catch (e) {}
+                    });
+
+                    // Ensure exam area is visible for admin (override guest UI hiding)
+                    try {
+                        const examAreaEl = document.getElementById('examArea');
+                        if (examAreaEl) examAreaEl.style.display = '';
+                    } catch (e) {}
+
+                    // Attach explicit handlers to injected admin buttons to ensure they call the page functions
+                    try {
+                        const rBtn = document.getElementById('recordsBtn');
+                        if (rBtn) {
+                            rBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                const callRecords = () => {
+                                    if (typeof window.showExamRecords === 'function') {
+                                        window.showExamRecords();
+                                    } else {
+                                        // Retry shortly in case scripts haven't initialized yet
+                                        setTimeout(() => {
+                                            if (typeof window.showExamRecords === 'function') window.showExamRecords();
+                                            else console.error('showExamRecords not found');
+                                        }, 200);
+                                    }
+                                };
+                                callRecords();
+                            });
+                        }
+                        const uBtn = document.getElementById('userMgmtBtn');
+                        if (uBtn) {
+                            uBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                const callUserMgmt = () => {
+                                    if (typeof window.showUserManagement === 'function') {
+                                        window.showUserManagement();
+                                    } else {
+                                        setTimeout(() => {
+                                            if (typeof window.showUserManagement === 'function') window.showUserManagement();
+                                            else console.error('showUserManagement not found');
+                                        }, 200);
+                                    }
+                                };
+                                callUserMgmt();
+                            });
+                        }
+                    } catch (e) { console.error('Error attaching admin button handlers', e); }
                 }
             } catch (e) {
                 localStorage.removeItem('adminToken');
@@ -994,23 +1047,34 @@ async def read_admin_dashboard():
                 if (!resp.ok) throw new Error('Failed to fetch users');
                 const users = await resp.json();
                 // Build simple modal
-                const modalHtml = `
-                    <div id="adminUserModal" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;">
-                      <div style="background:white;padding:20px;border-radius:8px;max-width:800px;width:90%;">
-                        <h3>使用者管理</h3>
-                        <table style="width:100%;border-collapse:collapse;">
-                          <thead><tr><th>Id</th><th>Username</th><th>Created</th><th>Action</th></tr></thead>
-                          <tbody>${users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.created_at || ''}</td><td><button onclick="adminDeleteUser(${u.id})" style="background:#f44336;">刪除</button> <button onclick="adminResetPassword(${u.id})" style="background:#2196F3;">重設密碼</button></td></tr>`).join('')}</tbody>
-                        </table>
-                        <div style="text-align:right;margin-top:12px;"><button onclick="document.getElementById('adminUserModal').remove()">關閉</button></div>
-                      </div>
-                    </div>
-                `;
-                const wrapper = document.createElement('div');
-                wrapper.innerHTML = modalHtml;
-                document.body.appendChild(wrapper);
+                                const modalHtml = `
+                                        <div id="adminUserModal" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;">
+                                            <div style="background:white;padding:20px;border-radius:8px;max-width:800px;width:90%;">
+                                                <h3>使用者管理</h3>
+                                                <table style="width:100%;border-collapse:collapse;">
+                                                    <thead><tr><th>Id</th><th>Username</th><th>Created</th><th>Action</th></tr></thead>
+                                                    <tbody>${users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.created_at || ''}</td><td><button onclick="adminDeleteUser(${u.id})" style="background:#f44336;">刪除</button> <button onclick="adminResetPassword(${u.id})" style="background:#2196F3;">重設密碼</button></td></tr>`).join('')}</tbody>
+                                                </table>
+                                                <div style="text-align:right;margin-top:12px;"><button onclick="closeAdminUserModal()">關閉</button></div>
+                                            </div>
+                                        </div>
+                                `;
+                                const wrapper = document.createElement('div');
+                                // give wrapper an id so the close button can remove the whole wrapper in one click
+                                wrapper.id = 'adminUserModalWrapper';
+                                wrapper.innerHTML = modalHtml;
+                                document.body.appendChild(wrapper);
             } catch (e) {
                 alert('無法取得使用者列表');
+            }
+        }
+
+        function closeAdminUserModal() {
+            const wrapperEl = document.getElementById('adminUserModalWrapper');
+            if (wrapperEl) wrapperEl.remove();
+            else {
+                const modalEl = document.getElementById('adminUserModal');
+                if (modalEl) modalEl.remove();
             }
         }
 
@@ -1021,7 +1085,8 @@ async def read_admin_dashboard():
                 const resp = await fetch('/api/admin/users/delete?user_id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(token), { method: 'POST' });
                 if (resp.ok) {
                     alert('已刪除');
-                    document.getElementById('adminUserModal').remove();
+                    // close the modal using the centralized helper
+                    if (typeof closeAdminUserModal === 'function') closeAdminUserModal();
                     showUserManagement();
                 } else {
                     alert('刪除失敗');
