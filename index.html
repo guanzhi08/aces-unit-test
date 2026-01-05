@@ -713,33 +713,53 @@
                     return;
                 }
 
-                // Aggregate by username
-                const byUser = {};
-                filtered.forEach(r => {
-                    const u = r.username || 'Unknown';
-                    if (!byUser[u]) byUser[u] = { total: 0, count: 0, best: 0 };
-                    byUser[u].total += r.score;
-                    byUser[u].count += 1;
-                    byUser[u].best = Math.max(byUser[u].best, r.score);
-                });
+                // Prepare categories for question counts
+                const categories = {
+                    '5': filtered.filter(r => Number(r.total_questions) === 5),
+                    '10': filtered.filter(r => Number(r.total_questions) === 10),
+                    'ALL': filtered.filter(r => Number(r.total_questions) > 10 || String(r.total_questions) === 'ALL')
+                };
 
-                const rows = Object.keys(byUser).map(u => ({
-                    username: u,
-                    avg: +(byUser[u].total / byUser[u].count).toFixed(1),
-                    attempts: byUser[u].count,
-                    best: byUser[u].best
-                }));
+                function buildRankingForList(list) {
+                    const byUser = {};
+                    list.forEach(r => {
+                        const u = r.username || 'Unknown';
+                        if (!byUser[u]) byUser[u] = { total: 0, count: 0, best: 0 };
+                        byUser[u].total += r.score;
+                        byUser[u].count += 1;
+                        byUser[u].best = Math.max(byUser[u].best, r.score);
+                    });
 
-                // Sort by average desc, then best desc
-                rows.sort((a, b) => b.avg - a.avg || b.best - a.best);
+                    const rows = Object.keys(byUser).map(u => ({
+                        username: u,
+                        avg: +(byUser[u].total / byUser[u].count).toFixed(1),
+                        attempts: byUser[u].count,
+                        best: byUser[u].best
+                    }));
 
-                // Build HTML table
+                    rows.sort((a, b) => b.avg - a.avg || b.best - a.best);
+                    return rows;
+                }
+
                 let html = `<div class="records-container"><h3>🏆 Unit ${unitNumber} 排行</h3>`;
-                html += `<div class="table-wrapper"><table class="records-table"><thead><tr><th>排行</th><th>用戶</th><th>平均分數</th><th>最高分</th><th>次數</th></tr></thead><tbody>`;
-                rows.forEach((r, idx) => {
-                    html += `<tr><td>${idx+1}</td><td>${r.username}</td><td>${r.avg}%</td><td>${r.best}%</td><td>${r.attempts}</td></tr>`;
+
+                // Build a table for each category
+                ['5','10','ALL'].forEach(cat => {
+                    const list = categories[cat] || [];
+                    const rows = buildRankingForList(list);
+                    html += `<h4 style="margin-top:16px;">${cat} 題</h4>`;
+                    if (rows.length === 0) {
+                        html += `<div style="padding:12px; background:#fff; border-radius:6px; margin-bottom:12px;">尚無 ${cat} 題 紀錄</div>`;
+                        return;
+                    }
+                    html += `<div class="table-wrapper"><table class="records-table"><thead><tr><th>排行</th><th>用戶</th><th>平均分數</th><th>最高分</th><th>次數</th></tr></thead><tbody>`;
+                    rows.forEach((r, idx) => {
+                        html += `<tr><td>${idx+1}</td><td>${r.username}</td><td>${r.avg}%</td><td>${r.best}%</td><td>${r.attempts}</td></tr>`;
+                    });
+                    html += `</tbody></table></div>`;
                 });
-                html += `</tbody></table></div><div style="text-align:center;margin-top:12px;"><button onclick="resetExam()" style="background-color:#4CAF50;color:#fff;padding:10px 20px;border-radius:4px;">關閉</button></div></div>`;
+
+                html += `<div style="text-align:center;margin-top:12px;"><button onclick="resetExam()" style="background-color:#4CAF50;color:#fff;padding:10px 20px;border-radius:4px;">關閉</button></div></div>`;
 
                 document.getElementById('examArea').innerHTML = html;
             } catch (err) {
