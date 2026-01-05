@@ -557,7 +557,8 @@
         let userTypes = [];
         let currentIndex = 0;
         let WORD_TYPES = [];
-        const CSV_FILE = 'ACES-S5-Unit.csv';
+        // Use absolute path to avoid requests being prefixed by subpaths (e.g. /admin)
+        const CSV_FILE = '/ACES-S5-Unit.csv';
         const API_BASE = '';  // Empty for same-origin, or set to 'http://localhost:8000' if needed
         let shuffledPool = [];
         let poolIndex = 0;
