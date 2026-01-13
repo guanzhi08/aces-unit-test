@@ -1250,42 +1250,67 @@ async def read_admin_dashboard():
         }
         
         // User management: fetch list, delete, reset password
+        let allUserRecords = [];
+
         async function showUserManagement() {
             const token = localStorage.getItem('adminToken');
             try {
                 const resp = await fetch('/api/admin/users?token=' + encodeURIComponent(token));
                 if (!resp.ok) throw new Error('Failed to fetch users');
-                const users = await resp.json();
-                // Build simple modal
-                                const modalHtml = `
-                                        <div id="adminUserModal" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;">
-                                            <div style="background:white;padding:20px;border-radius:8px;max-width:800px;width:90%;">
-                                                <h3>使用者管理</h3>
-                                                <table style="width:100%;border-collapse:collapse;">
-                                                    <thead><tr><th>Id</th><th>Username</th><th>Created</th><th>Action</th></tr></thead>
-                                                    <tbody>${users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.created_at || ''}</td><td><button onclick="adminDeleteUser(${u.id})" style="background:#f44336;">刪除</button> <button onclick="adminResetPassword(${u.id})" style="background:#2196F3;">重設密碼</button></td></tr>`).join('')}</tbody>
-                                                </table>
-                                                <div style="text-align:right;margin-top:12px;"><button onclick="closeAdminUserModal()">關閉</button></div>
-                                            </div>
-                                        </div>
-                                `;
-                                const wrapper = document.createElement('div');
-                                // give wrapper an id so the close button can remove the whole wrapper in one click
-                                wrapper.id = 'adminUserModalWrapper';
-                                wrapper.innerHTML = modalHtml;
-                                document.body.appendChild(wrapper);
+                allUserRecords = await resp.json();
+                
+                const html = `
+                <div class="records-container">
+                    <h3>👥 使用者管理</h3>
+                    <div class="records-toolbar">
+                        <div>
+                            <span id="userRecordCount">共 ${allUserRecords.length} 位使用者</span>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="records-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>使用者名稱</th>
+                                    <th>建立時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userRecordsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">關閉</button>
+                    </div>
+                </div>`;
+                
+                document.getElementById('examArea').innerHTML = html;
+                renderUserRecordsTable(allUserRecords);
             } catch (e) {
+                console.error('Error loading users:', e);
                 alert('無法取得使用者列表');
             }
         }
 
-        function closeAdminUserModal() {
-            const wrapperEl = document.getElementById('adminUserModalWrapper');
-            if (wrapperEl) wrapperEl.remove();
-            else {
-                const modalEl = document.getElementById('adminUserModal');
-                if (modalEl) modalEl.remove();
-            }
+        function renderUserRecordsTable(users) {
+            const tbody = document.getElementById('userRecordsBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = users.map(u => `
+                <tr id="user-row-${u.id}">
+                    <td>${u.id}</td>
+                    <td>${u.username}</td>
+                    <td>${u.created_at || ''}</td>
+                    <td>
+                        <button class="btn-edit" onclick="adminResetPassword(${u.id})">重設密碼</button>
+                        <button class="btn-delete" onclick="adminDeleteUser(${u.id})">刪除</button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('userRecordCount').textContent = `共 ${users.length} 位使用者`;
         }
 
         async function adminDeleteUser(id) {
@@ -1295,8 +1320,6 @@ async def read_admin_dashboard():
                 const resp = await fetch('/api/admin/users/delete?user_id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(token), { method: 'POST' });
                 if (resp.ok) {
                     alert('已刪除');
-                    // close the modal using the centralized helper
-                    if (typeof closeAdminUserModal === 'function') closeAdminUserModal();
                     showUserManagement();
                 } else {
                     alert('刪除失敗');
