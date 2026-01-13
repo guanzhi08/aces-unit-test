@@ -144,6 +144,16 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS incorrect_answers (
+                id SERIAL PRIMARY KEY,
+                username TEXT,
+                unit_number TEXT NOT NULL,
+                chinese TEXT NOT NULL,
+                english TEXT NOT NULL,
+                last_incorrect TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         # Users table for account creation
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -187,6 +197,16 @@ def init_db():
             CREATE TABLE IF NOT EXISTS admin_sessions (
                 token TEXT PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS incorrect_answers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                unit_number TEXT NOT NULL,
+                chinese TEXT NOT NULL,
+                english TEXT NOT NULL,
+                last_incorrect TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
     
@@ -242,6 +262,13 @@ class ScoreCurveData(BaseModel):
     type_accuracies: List[float]
 
 
+class IncorrectItem(BaseModel):
+    username: Optional[str] = None
+    unit_number: str
+    chinese: str
+    english: str
+
+
 class UserStats(BaseModel):
     username: str
     total_exams: int
@@ -292,6 +319,69 @@ async def save_exam_result(result: ExamResult):
         total_questions=row['total_questions'],
         exam_date=format_exam_date(row['exam_date'])
     )
+
+
+@app.post('/api/incorrect')
+async def save_incorrect(items: List[IncorrectItem]):
+    """Save incorrect answers (accepts a list of incorrect items)."""
+    if not items:
+        return {"saved": 0}
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    saved = 0
+    for it in items:
+        try:
+            cursor.execute(sql('''
+                INSERT INTO incorrect_answers (username, unit_number, chinese, english)
+                VALUES (?, ?, ?, ?)
+            '''), (it.username or '', it.unit_number, it.chinese, it.english))
+            saved += 1
+        except Exception:
+            continue
+
+    conn.commit()
+    conn.close()
+    return {"saved": saved}
+
+
+@app.get('/api/incorrect')
+async def get_incorrect(unit: Optional[str] = None, username: Optional[str] = None, limit: int = 1000):
+    """Return incorrect answers for a given unit (optionally filtered by username)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    params = []
+    if unit and username:
+        cursor.execute(sql('''
+            SELECT * FROM incorrect_answers WHERE unit_number = ? AND username = ? ORDER BY last_incorrect DESC LIMIT ?
+        '''), (unit, username, limit))
+    elif unit:
+        cursor.execute(sql('''
+            SELECT * FROM incorrect_answers WHERE unit_number = ? ORDER BY last_incorrect DESC LIMIT ?
+        '''), (unit, limit))
+    elif username:
+        cursor.execute(sql('''
+            SELECT * FROM incorrect_answers WHERE username = ? ORDER BY last_incorrect DESC LIMIT ?
+        '''), (username, limit))
+    else:
+        cursor.execute(sql('SELECT * FROM incorrect_answers ORDER BY last_incorrect DESC LIMIT ?'), (limit,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Normalize output keys to expected casing (English/Chinese)
+    result = []
+    for row in rows:
+        result.append({
+            'id': row['id'],
+            'username': row.get('username', row['username']) if isinstance(row, dict) else row['username'],
+            'unit_number': row['unit_number'],
+            'Chinese': row['chinese'],
+            'English': row['english'],
+            'last_incorrect': format_exam_date(row['last_incorrect'])
+        })
+    return result
 
 
 @app.get("/api/results/{username}", response_model=List[ExamResultResponse])

@@ -545,7 +545,34 @@
             <button onclick="resetExam()" id="resetBtn">重置</button>
             <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
             <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">單元排行</button>
-            <!-- ADMIN_BUTTON_PLACEHOLDER -->            
+            <!-- Admin controls -->
+            <button id="adminToggleBtn" onclick="toggleAdminMode()" style="background:#673AB7; margin-left:8px;">Admin</button>
+        </div>
+    </div>
+
+    <div id="incorrectAdminPanel" class="hidden" style="margin: 12px 0;">
+        <div class="records-container">
+            <h3>🔧 Incorrect Items Admin</h3>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                <label>User:</label>
+                <select id="adminFilterUser">
+                    <option value="">All Users</option>
+                </select>
+                <label>Unit:</label>
+                <select id="adminFilterUnit">
+                    <option value="">All Units</option>
+                </select>
+                <button onclick="loadIncorrectAdmin()">Load</button>
+                <button onclick="hideAdminPanel()" style="background:#9e9e9e;">Close</button>
+            </div>
+            <div class="table-wrapper">
+                <table class="records-table">
+                    <thead>
+                        <tr><th>ID</th><th>User</th><th>Unit</th><th>Chinese</th><th>English</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="incorrectAdminBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -1719,6 +1746,36 @@
             
             // Save result to backend
             saveExamResult(percentage, typePercentage, correctCount, totalQuestions);
+
+            // Collect incorrect answers and send to backend for tracking
+            const incorrectItems = [];
+            currentData.forEach((row, index) => {
+                const rawUserAnswer = (userAnswers[index] || '').trim();
+                // Skip empty / no-answer items; only log when user actually attempted a spelling
+                if (!rawUserAnswer) return;
+
+                const userAnswer = normalizeText(rawUserAnswer);
+                const correctAnswer = normalizeText(row.English || '');
+                const isAnswerCorrect = userAnswer === correctAnswer;
+                if (!isAnswerCorrect) {
+                    incorrectItems.push({
+                        username: (document.getElementById('username').value || '').trim(),
+                        unit_number: row.Unit || row.unit || document.getElementById('unitNumber').value,
+                        chinese: row.Chinese,
+                        english: row.English
+                    });
+                }
+            });
+
+            if (incorrectItems.length > 0) {
+                fetch(`${API_BASE}/api/incorrect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(incorrectItems)
+                }).then(resp => {
+                    if (!resp.ok) console.warn('Failed to save incorrect items');
+                }).catch(err => console.warn('Error saving incorrect items', err));
+            }
             
             const resultHTML = `
             <div class="result-summary">
@@ -1777,6 +1834,10 @@
                     // Generate table HTML
                     let tableHTML = `
                     <div style="background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <style>
+                            .incorrect-row { background-color: #ffe6e6 !important; border-left: 4px solid #f44336 !important; }
+                            .incorrect-row td { background-color: transparent !important; }
+                        </style>
                         <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Unit ${unitNumber} Vocabulary Table</h2>
                         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                             <thead>
@@ -1790,10 +1851,46 @@
                             </thead>
                             <tbody>`;
                     
-                    filteredData.forEach((row, index) => {
-                        const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
-                        const englishWord = row.English.replace(/'/g, "\\'");
-                        tableHTML += `
+                    // Fetch incorrect items for this unit and highlight matching rows
+                    fetch(`${API_BASE}/api/incorrect?unit=${encodeURIComponent(unitNumber)}`)
+                        .then(r => r.ok ? r.json() : [])
+                        .then(incorrectList => {
+                            const incorrectSet = new Set((incorrectList || []).map(i => normalizeText(i.English || i.english || '')));
+                            filteredData.forEach((row, index) => {                                
+                                const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+                                const englishWord = row.English.replace(/'/g, "\\'");
+                                const isIncorrect = incorrectSet.has(normalizeText(row.English || ''));
+                                const rowClass = isIncorrect ? 'incorrect-row' : '';                                
+                                console.log('isIncorrect:', isIncorrect, 'for word:', row.English);
+                                tableHTML += `
+                                <tr class="${rowClass}" style="background-color: ${bgColor};">
+                                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${index + 1}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${row.Chinese}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${row.English}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${row.Type || row.PoS || ''}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
+                                        <button onclick="pronounceWord('${englishWord}')" style="background-color: #007bff; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;">🔊</button>
+                                    </td>
+                                </tr>`;
+                            });
+
+                            tableHTML += `
+                            </tbody>
+                        </table>
+                        <div style="text-align: center;">
+                            <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">Close Table</button>
+                        </div>
+                    </div>`;
+
+                            document.getElementById('examArea').innerHTML = tableHTML;
+                        })
+                        .catch(err => {
+                            console.warn('Failed to fetch incorrect items', err);
+                            // Render table without highlights on error
+                            filteredData.forEach((row, index) => {
+                                const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+                                const englishWord = row.English.replace(/'/g, "\\'");
+                                tableHTML += `
                                 <tr style="background-color: ${bgColor};">
                                     <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${index + 1}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${row.Chinese}</td>
@@ -1803,17 +1900,18 @@
                                         <button onclick="pronounceWord('${englishWord}')" style="background-color: #007bff; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;">🔊</button>
                                     </td>
                                 </tr>`;
-                    });
-                    
-                    tableHTML += `
+                            });
+
+                            tableHTML += `
                             </tbody>
                         </table>
                         <div style="text-align: center;">
                             <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">Close Table</button>
                         </div>
                     </div>`;
-                    
-                    document.getElementById('examArea').innerHTML = tableHTML;
+
+                            document.getElementById('examArea').innerHTML = tableHTML;
+                        });
                 })
                 .catch(error => {
                     alert(error.message);
