@@ -545,34 +545,7 @@
             <button onclick="resetExam()" id="resetBtn">重置</button>
             <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
             <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">單元排行</button>
-            <!-- Admin controls -->
-            <button id="adminToggleBtn" onclick="toggleAdminMode()" style="background:#673AB7; margin-left:8px;">Admin</button>
-        </div>
-    </div>
-
-    <div id="incorrectAdminPanel" class="hidden" style="margin: 12px 0;">
-        <div class="records-container">
-            <h3>🔧 Incorrect Items Admin</h3>
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
-                <label>User:</label>
-                <select id="adminFilterUser">
-                    <option value="">All Users</option>
-                </select>
-                <label>Unit:</label>
-                <select id="adminFilterUnit">
-                    <option value="">All Units</option>
-                </select>
-                <button onclick="loadIncorrectAdmin()">Load</button>
-                <button onclick="hideAdminPanel()" style="background:#9e9e9e;">Close</button>
-            </div>
-            <div class="table-wrapper">
-                <table class="records-table">
-                    <thead>
-                        <tr><th>ID</th><th>User</th><th>Unit</th><th>Chinese</th><th>English</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody id="incorrectAdminBody"></tbody>
-                </table>
-            </div>
+            <!-- ADMIN_BUTTON_PLACEHOLDER -->            
         </div>
     </div>
 
