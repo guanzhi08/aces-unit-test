@@ -1153,7 +1153,7 @@ async def read_admin_dashboard():
                     window.location.href = '/admin';
                 } else {
                     // Hide non-admin controls when viewing as admin
-                    const hideIds = ['unitNumber','questionCount','showTableBtn','startBtn','historyBtn','resetBtn'];
+                    const hideIds = ['unitNumber','questionCount','showTableBtn','startBtn','historyBtn','resetBtn','incorrectExamBtn'];
                     hideIds.forEach(id => {
                         try {
                             const el = document.getElementById(id);

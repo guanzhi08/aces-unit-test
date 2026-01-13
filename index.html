@@ -542,6 +542,7 @@
             </select>
             <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
             <button onclick="startExam()" id="startBtn">模擬考</button>
+            <button onclick="startIncorrectExam()" id="incorrectExamBtn" style="background-color: #FF9800;">錯字練習</button>
             <button onclick="resetExam()" id="resetBtn">重置</button>
             <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
             <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">單元排行</button>
@@ -677,7 +678,7 @@
 
         // Show or hide exam-related UI based on whether the user is authenticated
         function updateAuthUI(authenticated) {
-            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea','rankingBtn'];
+            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea','rankingBtn','incorrectExamBtn'];
             idsToShow.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -1437,6 +1438,92 @@
                 });
         }
 
+        // Incorrect answers exam mode
+        async function startIncorrectExam() {
+            const username = document.getElementById('username').value.trim();
+            const unitNumber = document.getElementById('unitNumber').value;
+            const questionCountValue = document.getElementById('questionCount').value;
+            
+            if (!username) {
+                alert('請先輸入名字並登入');
+                return;
+            }
+            
+            try {
+                // Fetch incorrect answers for this user and unit
+                const resp = await fetch(`${API_BASE}/api/incorrect?username=${encodeURIComponent(username)}&unit=${encodeURIComponent(unitNumber)}`);
+                if (!resp.ok) throw new Error('無法取得錯字紀錄');
+                
+                let incorrectItems = await resp.json();
+                
+                if (incorrectItems.length === 0) {
+                    alert(`Unit ${unitNumber} 尚無錯字紀錄！繼續練習模擬考來累積錯字。`);
+                    return;
+                }
+                
+                // Remove duplicates based on English word (keep latest)
+                const seen = new Set();
+                incorrectItems = incorrectItems.filter(item => {
+                    const key = normalizeText(item.English || '');
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+                
+                // Extract unique word types from incorrect items
+                // We need to fetch CSV to get type info since incorrect_answers doesn't store it
+                const csvResp = await fetch(CSV_FILE);
+                if (!csvResp.ok) throw new Error('CSV file not found');
+                const csvText = await csvResp.text();
+                const csvData = parseCSV(csvText);
+                
+                // Build lookup map from CSV
+                const csvLookup = {};
+                csvData.forEach(row => {
+                    const key = normalizeText(row.English || '');
+                    csvLookup[key] = row;
+                });
+                
+                // Map incorrect items to full data with Type
+                const typesSet = new Set();
+                const examData = incorrectItems.map(item => {
+                    const key = normalizeText(item.English || '');
+                    const csvRow = csvLookup[key];
+                    const type = csvRow ? (csvRow.Type || csvRow.PoS || '') : '';
+                    if (type.trim()) typesSet.add(type.trim());
+                    return {
+                        Chinese: item.Chinese,
+                        English: item.English,
+                        Type: type,
+                        Unit: item.unit_number
+                    };
+                });
+                
+                WORD_TYPES = Array.from(typesSet).sort();
+                
+                // Determine how many questions
+                const questionsNeeded = questionCountValue === 'ALL' ? examData.length : Math.min(parseInt(questionCountValue), examData.length);
+                
+                // Shuffle and select
+                const shuffled = shuffleArray(examData);
+                const selectedData = shuffled.slice(0, questionsNeeded);
+                
+                console.log(`📝 錯字練習 - ${selectedData.length} 題 (共 ${examData.length} 個錯字)`);
+                
+                currentData = selectedData;
+                userAnswers = new Array(currentData.length).fill('');
+                userTypes = new Array(currentData.length).fill('');
+                currentIndex = 0;
+                
+                document.getElementById('incorrectExamBtn').textContent = '重出題';
+                
+                showQuestion(0);
+            } catch (error) {
+                console.error('Error starting incorrect exam:', error);
+                alert(error.message || '無法載入錯字練習');
+            }
+        }
+
         function showQuestion(index) {
             if (index < 0 || index >= currentData.length) return;
             
@@ -1781,6 +1868,8 @@
             currentIndex = 0;
             document.getElementById('examArea').innerHTML = '';
             document.getElementById('startBtn').textContent = '模擬考';
+            const incorrectBtn = document.getElementById('incorrectExamBtn');
+            if (incorrectBtn) incorrectBtn.textContent = '錯字練習';
         }
 
         function showVocabularyTable() {
