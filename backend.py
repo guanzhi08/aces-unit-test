@@ -286,6 +286,12 @@ class ExamResultUpdate(BaseModel):
     total_questions: Optional[int] = None
 
 
+class IncorrectItemUpdate(BaseModel):
+    chinese: Optional[str] = None
+    english: Optional[str] = None
+    unit_number: Optional[str] = None
+
+
 @app.post("/api/results", response_model=ExamResultResponse)
 async def save_exam_result(result: ExamResult):
     """Save an exam result to the database."""
@@ -382,6 +388,72 @@ async def get_incorrect(unit: Optional[str] = None, username: Optional[str] = No
             'last_incorrect': format_exam_date(row['last_incorrect'])
         })
     return result
+
+
+@app.put('/api/incorrect/{item_id}')
+async def update_incorrect(item_id: int, update: IncorrectItemUpdate):
+    """Update an incorrect answer record."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if record exists
+    cursor.execute(sql('SELECT * FROM incorrect_answers WHERE id = ?'), (item_id,))
+    existing = cursor.fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    # Build update query dynamically
+    updates = []
+    values = []
+    if update.chinese is not None:
+        updates.append('chinese = ?')
+        values.append(update.chinese)
+    if update.english is not None:
+        updates.append('english = ?')
+        values.append(update.english)
+    if update.unit_number is not None:
+        updates.append('unit_number = ?')
+        values.append(update.unit_number)
+    
+    if updates:
+        values.append(item_id)
+        query = f'UPDATE incorrect_answers SET {", ".join(updates)} WHERE id = ?'
+        cursor.execute(sql(query), tuple(values))
+        conn.commit()
+    
+    # Fetch updated record
+    cursor.execute(sql('SELECT * FROM incorrect_answers WHERE id = ?'), (item_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    return {
+        'id': row['id'],
+        'username': row['username'],
+        'unit_number': row['unit_number'],
+        'Chinese': row['chinese'],
+        'English': row['english'],
+        'last_incorrect': format_exam_date(row['last_incorrect'])
+    }
+
+
+@app.delete('/api/incorrect/{item_id}')
+async def delete_incorrect(item_id: int):
+    """Delete an incorrect answer record."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if record exists
+    cursor.execute(sql('SELECT id FROM incorrect_answers WHERE id = ?'), (item_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    cursor.execute(sql('DELETE FROM incorrect_answers WHERE id = ?'), (item_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Record deleted successfully", "id": item_id}
 
 
 @app.get("/api/results/{username}", response_model=List[ExamResultResponse])
@@ -1059,6 +1131,7 @@ async def read_admin_dashboard():
     
     # Inject admin button and logout functionality
         admin_button = '''<button id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
+            <button id="incorrectMgmtBtn" style="background-color: #FF9800;">錯字管理</button>
             <button id="userMgmtBtn" style="background-color: #2196F3;">使用者管理</button>
             <button onclick="adminLogout()" style="background-color: #f44336;">登出</button>'''
     html_content = html_content.replace("<!-- ADMIN_BUTTON_PLACEHOLDER -->", admin_button)
@@ -1152,6 +1225,13 @@ async def read_admin_dashboard():
                                 callUserMgmt();
                             });
                         }
+                        const iBtn = document.getElementById('incorrectMgmtBtn');
+                        if (iBtn) {
+                            iBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                showIncorrectManagement();
+                            });
+                        }
                     } catch (e) { console.error('Error attaching admin button handlers', e); }
                 }
             } catch (e) {
@@ -1232,6 +1312,181 @@ async def read_admin_dashboard():
                 const resp = await fetch('/api/admin/users/reset-password?user_id=' + encodeURIComponent(id) + '&new_password=' + passParam + '&token=' + encodeURIComponent(token), { method: 'POST' });
                 if (resp.ok) { alert('密碼已重設'); } else { alert('重設失敗'); }
             } catch (e) { alert('重設錯誤'); }
+        }
+
+        // Incorrect answer management
+        let allIncorrectRecords = [];
+
+        async function showIncorrectManagement(filterUser = '', filterUnit = '') {
+            try {
+                let url = '/api/incorrect?limit=2000';
+                if (filterUser) url += '&username=' + encodeURIComponent(filterUser);
+                if (filterUnit) url += '&unit=' + encodeURIComponent(filterUnit);
+                
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Failed to fetch incorrect records');
+                allIncorrectRecords = await resp.json();
+                
+                // Get unique users and units for filters
+                const users = [...new Set(allIncorrectRecords.map(r => r.username))].sort();
+                const units = [...new Set(allIncorrectRecords.map(r => r.unit_number))].sort((a, b) => parseInt(a) - parseInt(b));
+                
+                const html = `
+                <div class="records-container">
+                    <h3>📝 錯字管理</h3>
+                    <div class="records-toolbar">
+                        <div>
+                            <label>篩選用戶:</label>
+                            <select id="incorrectFilterUser" onchange="filterIncorrectRecords()">
+                                <option value="">全部用戶</option>
+                                ${users.map(u => `<option value="${u}" ${u === filterUser ? 'selected' : ''}>${u}</option>`).join('')}
+                            </select>
+                            <label>Unit:</label>
+                            <select id="incorrectFilterUnit" onchange="filterIncorrectRecords()">
+                                <option value="">全部Unit</option>
+                                ${units.map(u => `<option value="${u}" ${u === filterUnit ? 'selected' : ''}>${u}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <span id="incorrectRecordCount">共 ${allIncorrectRecords.length} 筆紀錄</span>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="records-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用戶</th>
+                                    <th>Unit</th>
+                                    <th>中文</th>
+                                    <th>英文</th>
+                                    <th>時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incorrectRecordsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">關閉</button>
+                    </div>
+                </div>`;
+                
+                document.getElementById('examArea').innerHTML = html;
+                renderIncorrectRecordsTable(allIncorrectRecords);
+            } catch (e) {
+                console.error('Error loading incorrect records:', e);
+                alert('無法載入錯字紀錄');
+            }
+        }
+
+        function renderIncorrectRecordsTable(records) {
+            const tbody = document.getElementById('incorrectRecordsBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = records.map(r => `
+                <tr id="incorrect-row-${r.id}">
+                    <td>${r.id}</td>
+                    <td>${r.username || ''}</td>
+                    <td id="incorrect-cell-unit-${r.id}">${r.unit_number}</td>
+                    <td id="incorrect-cell-chinese-${r.id}">${r.Chinese}</td>
+                    <td id="incorrect-cell-english-${r.id}">${r.English}</td>
+                    <td>${r.last_incorrect || ''}</td>
+                    <td id="incorrect-cell-actions-${r.id}">
+                        <button class="btn-edit" onclick="startEditIncorrect(${r.id})">編輯</button>
+                        <button class="btn-delete" onclick="deleteIncorrect(${r.id})">刪除</button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('incorrectRecordCount').textContent = `共 ${records.length} 筆紀錄`;
+        }
+
+        function filterIncorrectRecords() {
+            const userFilter = document.getElementById('incorrectFilterUser').value;
+            const unitFilter = document.getElementById('incorrectFilterUnit').value;
+            showIncorrectManagement(userFilter, unitFilter);
+        }
+
+        function startEditIncorrect(id) {
+            const record = allIncorrectRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            document.getElementById(`incorrect-cell-unit-${id}`).innerHTML = 
+                `<input type="text" id="edit-incorrect-unit-${id}" value="${record.unit_number}" style="width:50px;">`;
+            document.getElementById(`incorrect-cell-chinese-${id}`).innerHTML = 
+                `<input type="text" id="edit-incorrect-chinese-${id}" value="${record.Chinese}" style="width:100px;">`;
+            document.getElementById(`incorrect-cell-english-${id}`).innerHTML = 
+                `<input type="text" id="edit-incorrect-english-${id}" value="${record.English}" style="width:100px;">`;
+            document.getElementById(`incorrect-cell-actions-${id}`).innerHTML = 
+                `<button class="btn-save" onclick="saveEditIncorrect(${id})">儲存</button>
+                 <button class="btn-cancel" onclick="cancelEditIncorrect(${id})">取消</button>`;
+        }
+
+        function cancelEditIncorrect(id) {
+            const record = allIncorrectRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            document.getElementById(`incorrect-cell-unit-${id}`).innerHTML = record.unit_number;
+            document.getElementById(`incorrect-cell-chinese-${id}`).innerHTML = record.Chinese;
+            document.getElementById(`incorrect-cell-english-${id}`).innerHTML = record.English;
+            document.getElementById(`incorrect-cell-actions-${id}`).innerHTML = 
+                `<button class="btn-edit" onclick="startEditIncorrect(${id})">編輯</button>
+                 <button class="btn-delete" onclick="deleteIncorrect(${id})">刪除</button>`;
+        }
+
+        async function saveEditIncorrect(id) {
+            const unitNumber = document.getElementById(`edit-incorrect-unit-${id}`).value;
+            const chinese = document.getElementById(`edit-incorrect-chinese-${id}`).value;
+            const english = document.getElementById(`edit-incorrect-english-${id}`).value;
+            
+            try {
+                const resp = await fetch(`/api/incorrect/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        unit_number: unitNumber,
+                        chinese: chinese,
+                        english: english
+                    })
+                });
+                
+                if (!resp.ok) throw new Error('Failed to update');
+                
+                const updated = await resp.json();
+                const index = allIncorrectRecords.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    allIncorrectRecords[index] = updated;
+                }
+                
+                // Re-render
+                const userFilter = document.getElementById('incorrectFilterUser')?.value || '';
+                const unitFilter = document.getElementById('incorrectFilterUnit')?.value || '';
+                showIncorrectManagement(userFilter, unitFilter);
+            } catch (e) {
+                console.error('Error updating incorrect record:', e);
+                alert('更新失敗');
+            }
+        }
+
+        async function deleteIncorrect(id) {
+            if (!confirm('確定要刪除這筆錯字紀錄嗎？')) return;
+            
+            try {
+                const resp = await fetch(`/api/incorrect/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('Failed to delete');
+                
+                allIncorrectRecords = allIncorrectRecords.filter(r => r.id !== id);
+                
+                // Re-render
+                const userFilter = document.getElementById('incorrectFilterUser')?.value || '';
+                const unitFilter = document.getElementById('incorrectFilterUnit')?.value || '';
+                showIncorrectManagement(userFilter, unitFilter);
+            } catch (e) {
+                console.error('Error deleting incorrect record:', e);
+                alert('刪除失敗');
+            }
         }
     </script>
 </body>'''
