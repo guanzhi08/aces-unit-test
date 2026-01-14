@@ -1470,27 +1470,30 @@
                     return true;
                 });
                 
-                // Extract unique word types from incorrect items
-                // We need to fetch CSV to get type info since incorrect_answers doesn't store it
+                // Fetch CSV and build lookup map from CSV for the selected unit
                 const csvResp = await fetch(CSV_FILE);
                 if (!csvResp.ok) throw new Error('CSV file not found');
                 const csvText = await csvResp.text();
                 const csvData = parseCSV(csvText);
-                
-                // Build lookup map from CSV
+
+                // Filter CSV rows to the selected unit to derive all available types
+                const unitCsvRows = csvData.filter(r => r.Unit === unitNumber);
+
+                // Build lookup map from CSV for quick access and collect ALL types in the unit
                 const csvLookup = {};
-                csvData.forEach(row => {
+                const typesSet = new Set();
+                unitCsvRows.forEach(row => {
                     const key = normalizeText(row.English || '');
                     csvLookup[key] = row;
+                    const t = (row.Type || row.PoS || '').trim();
+                    if (t) typesSet.add(t);
                 });
-                
-                // Map incorrect items to full data with Type
-                const typesSet = new Set();
+
+                // Map incorrect items to full data with Type (fall back to csv lookup)
                 const examData = incorrectItems.map(item => {
                     const key = normalizeText(item.English || '');
                     const csvRow = csvLookup[key];
                     const type = csvRow ? (csvRow.Type || csvRow.PoS || '') : '';
-                    if (type.trim()) typesSet.add(type.trim());
                     return {
                         Chinese: item.Chinese,
                         English: item.English,
@@ -1498,7 +1501,8 @@
                         Unit: item.unit_number
                     };
                 });
-                
+
+                // Use all types from the unit (not only those seen in incorrect items)
                 WORD_TYPES = Array.from(typesSet).sort();
                 
                 // Determine how many questions
