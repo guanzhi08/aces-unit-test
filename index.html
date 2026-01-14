@@ -1913,18 +1913,28 @@
                             </thead>
                             <tbody>`;
                     
-                    // Fetch incorrect items for this unit and highlight matching rows
-                    fetch(`${API_BASE}/api/incorrect?unit=${encodeURIComponent(unitNumber)}`)
-                        .then(r => r.ok ? r.json() : [])
-                        .then(incorrectList => {
-                            const incorrectSet = new Set((incorrectList || []).map(i => normalizeText(i.English || i.english || '')));
-                            filteredData.forEach((row, index) => {                                
-                                const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
-                                const englishWord = row.English.replace(/'/g, "\\'");
-                                const isIncorrect = incorrectSet.has(normalizeText(row.English || ''));
-                                const rowClass = isIncorrect ? 'incorrect-row' : '';                                
-                                console.log('isIncorrect:', isIncorrect, 'for word:', row.English);
-                                tableHTML += `
+                    // Fetch incorrect items for this unit only for the current user and highlight matching rows
+                    const currentUser = (document.getElementById('username')?.value || '').trim();
+                    let incorrectPromise;
+                    if (currentUser) {
+                        incorrectPromise = fetch(`${API_BASE}/api/incorrect?unit=${encodeURIComponent(unitNumber)}&username=${encodeURIComponent(currentUser)}`)
+                            .then(r => r.ok ? r.json() : [])
+                            .catch(() => []);
+                    } else {
+                        // No username provided — do not highlight any rows
+                        incorrectPromise = Promise.resolve([]);
+                    }
+
+                    incorrectPromise.then(incorrectList => {
+                        const incorrectSet = new Set((incorrectList || []).map(i => normalizeText(i.English || i.english || '')));
+                        filteredData.forEach((row, index) => {
+                            const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+                            const englishWord = row.English.replace(/'/g, "\\'");
+                            const isIncorrect = incorrectSet.has(normalizeText(row.English || ''));
+                            const rowClass = isIncorrect ? 'incorrect-row' : '';
+                            // Only log when highlighting (helps keep console cleaner)
+                            if (isIncorrect) console.log('Highlighting incorrect word for user', currentUser, row.English);
+                            tableHTML += `
                                 <tr class="${rowClass}" style="background-color: ${bgColor};">
                                     <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${index + 1}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${row.Chinese}</td>
@@ -1934,9 +1944,9 @@
                                         <button onclick="pronounceWord('${englishWord}')" style="background-color: #007bff; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;">🔊</button>
                                     </td>
                                 </tr>`;
-                            });
+                        });
 
-                            tableHTML += `
+                        tableHTML += `
                             </tbody>
                         </table>
                         <div style="text-align: center;">
@@ -1944,15 +1954,14 @@
                         </div>
                     </div>`;
 
-                            document.getElementById('examArea').innerHTML = tableHTML;
-                        })
-                        .catch(err => {
-                            console.warn('Failed to fetch incorrect items', err);
-                            // Render table without highlights on error
-                            filteredData.forEach((row, index) => {
-                                const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
-                                const englishWord = row.English.replace(/'/g, "\\'");
-                                tableHTML += `
+                        document.getElementById('examArea').innerHTML = tableHTML;
+                    }).catch(err => {
+                        console.warn('Failed to fetch incorrect items', err);
+                        // Render table without highlights on error (treat as empty incorrectList)
+                        filteredData.forEach((row, index) => {
+                            const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+                            const englishWord = row.English.replace(/'/g, "\\'");
+                            tableHTML += `
                                 <tr style="background-color: ${bgColor};">
                                     <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${index + 1}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${row.Chinese}</td>
@@ -1962,9 +1971,9 @@
                                         <button onclick="pronounceWord('${englishWord}')" style="background-color: #007bff; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;">🔊</button>
                                     </td>
                                 </tr>`;
-                            });
+                        });
 
-                            tableHTML += `
+                        tableHTML += `
                             </tbody>
                         </table>
                         <div style="text-align: center;">
@@ -1972,8 +1981,8 @@
                         </div>
                     </div>`;
 
-                            document.getElementById('examArea').innerHTML = tableHTML;
-                        });
+                        document.getElementById('examArea').innerHTML = tableHTML;
+                    });
                 })
                 .catch(error => {
                     alert(error.message);
