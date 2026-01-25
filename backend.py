@@ -5,16 +5,18 @@ FastAPI backend for ACES Unit Test Practice
 - Uses SQLite locally, PostgreSQL on render.com (via DATABASE_URL)
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 import os
 import hashlib
 import secrets
+import json
+import io
 
 # Database configuration
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -1133,6 +1135,9 @@ async def read_admin_dashboard():
         admin_button = '''<button id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
             <button id="incorrectMgmtBtn" style="background-color: #FF9800;">錯字管理</button>
             <button id="userMgmtBtn" style="background-color: #2196F3;">使用者管理</button>
+            <button onclick="exportDatabase()" style="background-color: #607D8B;">匯出資料庫</button>
+            <button onclick="document.getElementById('importFileInput').click()" style="background-color: #795548;">匯入資料庫</button>
+            <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importDatabase(this)">
             <button onclick="adminLogout()" style="background-color: #f44336;">登出</button>'''
     html_content = html_content.replace("<!-- ADMIN_BUTTON_PLACEHOLDER -->", admin_button)
     
@@ -1511,6 +1516,83 @@ async def read_admin_dashboard():
                 alert('刪除失敗');
             }
         }
+
+        // Database Export/Import functions
+        async function exportDatabase() {
+            const token = localStorage.getItem('adminToken');
+            try {
+                const resp = await fetch('/api/admin/export-db?token=' + encodeURIComponent(token));
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'Export failed');
+                }
+                
+                // Get filename from Content-Disposition header or generate one
+                const disposition = resp.headers.get('Content-Disposition');
+                let filename = 'aces_backup.json';
+                if (disposition) {
+                    const match = disposition.match(/filename=([^;]+)/);
+                    if (match) filename = match[1];
+                }
+                
+                // Download the file
+                const blob = await resp.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                
+                alert('資料庫已成功匯出！');
+            } catch (e) {
+                console.error('Export error:', e);
+                alert('匯出失敗: ' + e.message);
+            }
+        }
+
+        async function importDatabase(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            if (!confirm('確定要匯入資料庫嗎？\\n\\n此操作會將備份檔案中的資料合併至現有資料庫（不會刪除現有資料）。\\n重複的資料將被跳過。')) {
+                input.value = '';
+                return;
+            }
+            
+            const token = localStorage.getItem('adminToken');
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const resp = await fetch('/api/admin/import-db?token=' + encodeURIComponent(token), {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await resp.json();
+                
+                if (!resp.ok) {
+                    throw new Error(result.detail || 'Import failed');
+                }
+                
+                let message = '資料庫匯入成功！\\n\\n匯入統計：\\n';
+                if (result.imported) {
+                    for (const [table, count] of Object.entries(result.imported)) {
+                        message += `- ${table}: ${count} 筆新資料\\n`;
+                    }
+                }
+                
+                alert(message);
+                input.value = '';
+            } catch (e) {
+                console.error('Import error:', e);
+                alert('匯入失敗: ' + e.message);
+                input.value = '';
+            }
+        }
     </script>
 </body>'''
     html_content = html_content.replace("</body>", admin_script)
@@ -1558,6 +1640,209 @@ async def admin_reset_password(user_id: int, new_password: str = "admin123", tok
     conn.commit()
     conn.close()
     return {"success": True, "id": user_id}
+
+
+@app.get("/api/admin/export-db")
+async def export_database(token: str = ""):
+    """Export all database tables as JSON for backup. Admin only."""
+    require_admin(token)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    export_data = {
+        "export_date": datetime.now(timezone.utc).isoformat(),
+        "tables": {}
+    }
+    
+    # Export exam_results
+    cursor.execute('SELECT * FROM exam_results ORDER BY id')
+    rows = cursor.fetchall()
+    export_data["tables"]["exam_results"] = [
+        {
+            "id": row['id'],
+            "username": row['username'],
+            "unit_number": row['unit_number'],
+            "score": row['score'],
+            "type_accuracy": row['type_accuracy'],
+            "correct_count": row['correct_count'],
+            "total_questions": row['total_questions'],
+            "exam_date": format_exam_date(row['exam_date'])
+        } for row in rows
+    ]
+    
+    # Export users
+    cursor.execute('SELECT * FROM users ORDER BY id')
+    rows = cursor.fetchall()
+    export_data["tables"]["users"] = [
+        {
+            "id": row['id'],
+            "username": row['username'],
+            "password_hash": row['password_hash'],
+            "created_at": format_exam_date(row['created_at'])
+        } for row in rows
+    ]
+    
+    # Export admin_settings
+    cursor.execute('SELECT * FROM admin_settings ORDER BY id')
+    rows = cursor.fetchall()
+    export_data["tables"]["admin_settings"] = [
+        {
+            "id": row['id'],
+            "setting_key": row['setting_key'],
+            "setting_value": row['setting_value']
+        } for row in rows
+    ]
+    
+    # Export incorrect_answers
+    cursor.execute('SELECT * FROM incorrect_answers ORDER BY id')
+    rows = cursor.fetchall()
+    export_data["tables"]["incorrect_answers"] = [
+        {
+            "id": row['id'],
+            "username": row['username'],
+            "unit_number": row['unit_number'],
+            "chinese": row['chinese'],
+            "english": row['english'],
+            "last_incorrect": format_exam_date(row['last_incorrect'])
+        } for row in rows
+    ]
+    
+    conn.close()
+    
+    # Return as downloadable JSON file
+    json_str = json.dumps(export_data, ensure_ascii=False, indent=2)
+    return StreamingResponse(
+        io.BytesIO(json_str.encode('utf-8')),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename=aces_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        }
+    )
+
+
+@app.post("/api/admin/import-db")
+async def import_database(token: str = "", file: UploadFile = File(...)):
+    """Import database from JSON backup file. Admin only. This will MERGE data (not replace)."""
+    require_admin(token)
+    
+    try:
+        content = await file.read()
+        import_data = json.loads(content.decode('utf-8'))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON file: {str(e)}")
+    
+    if "tables" not in import_data:
+        raise HTTPException(status_code=400, detail="Invalid backup file format")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    imported_counts = {}
+    
+    try:
+        # Import users (skip if username already exists)
+        if "users" in import_data["tables"]:
+            count = 0
+            for user in import_data["tables"]["users"]:
+                try:
+                    cursor.execute(sql('SELECT id FROM users WHERE username = ?'), (user['username'],))
+                    if cursor.fetchone() is None:
+                        cursor.execute(sql('''
+                            INSERT INTO users (username, password_hash)
+                            VALUES (?, ?)
+                        '''), (user['username'], user['password_hash']))
+                        count += 1
+                except Exception:
+                    continue
+            imported_counts["users"] = count
+        
+        # Import exam_results (check for duplicates by username + exam_date)
+        if "exam_results" in import_data["tables"]:
+            count = 0
+            for result in import_data["tables"]["exam_results"]:
+                try:
+                    # Check for duplicate (same user, unit, and similar time)
+                    cursor.execute(sql('''
+                        SELECT id FROM exam_results 
+                        WHERE username = ? AND unit_number = ? AND score = ? AND correct_count = ?
+                    '''), (result['username'], result['unit_number'], result['score'], result['correct_count']))
+                    if cursor.fetchone() is None:
+                        cursor.execute(sql('''
+                            INSERT INTO exam_results (username, unit_number, score, type_accuracy, correct_count, total_questions)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        '''), (
+                            result['username'],
+                            result['unit_number'],
+                            result['score'],
+                            result['type_accuracy'],
+                            result['correct_count'],
+                            result['total_questions']
+                        ))
+                        count += 1
+                except Exception:
+                    continue
+            imported_counts["exam_results"] = count
+        
+        # Import incorrect_answers
+        if "incorrect_answers" in import_data["tables"]:
+            count = 0
+            for item in import_data["tables"]["incorrect_answers"]:
+                try:
+                    # Check for duplicate
+                    cursor.execute(sql('''
+                        SELECT id FROM incorrect_answers 
+                        WHERE username = ? AND unit_number = ? AND chinese = ? AND english = ?
+                    '''), (item['username'], item['unit_number'], item['chinese'], item['english']))
+                    if cursor.fetchone() is None:
+                        cursor.execute(sql('''
+                            INSERT INTO incorrect_answers (username, unit_number, chinese, english)
+                            VALUES (?, ?, ?, ?)
+                        '''), (
+                            item['username'],
+                            item['unit_number'],
+                            item['chinese'],
+                            item['english']
+                        ))
+                        count += 1
+                except Exception:
+                    continue
+            imported_counts["incorrect_answers"] = count
+        
+        # Import admin_settings (update if key exists, insert if not)
+        if "admin_settings" in import_data["tables"]:
+            count = 0
+            for setting in import_data["tables"]["admin_settings"]:
+                try:
+                    if USE_POSTGRES:
+                        cursor.execute('''
+                            INSERT INTO admin_settings (setting_key, setting_value)
+                            VALUES (%s, %s)
+                            ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value
+                        ''', (setting['setting_key'], setting['setting_value']))
+                    else:
+                        cursor.execute('''
+                            INSERT OR REPLACE INTO admin_settings (setting_key, setting_value)
+                            VALUES (?, ?)
+                        ''', (setting['setting_key'], setting['setting_value']))
+                    count += 1
+                except Exception:
+                    continue
+            imported_counts["admin_settings"] = count
+        
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    
+    conn.close()
+    
+    return {
+        "success": True,
+        "message": "Database imported successfully",
+        "imported": imported_counts
+    }
 
 
 @app.get("/{filename}")
