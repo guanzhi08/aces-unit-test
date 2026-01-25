@@ -1749,9 +1749,9 @@ async def import_database(token: str = "", file: UploadFile = File(...)):
                     cursor.execute(sql('SELECT id FROM users WHERE username = ?'), (user['username'],))
                     if cursor.fetchone() is None:
                         cursor.execute(sql('''
-                            INSERT INTO users (username, password_hash)
-                            VALUES (?, ?)
-                        '''), (user['username'], user['password_hash']))
+                            INSERT INTO users (username, password_hash, created_at)
+                            VALUES (?, ?, ?)
+                        '''), (user['username'], user['password_hash'], user.get('created_at')))
                         count += 1
                 except Exception:
                     continue
@@ -1769,15 +1769,16 @@ async def import_database(token: str = "", file: UploadFile = File(...)):
                     '''), (result['username'], result['unit_number'], result['score'], result['correct_count']))
                     if cursor.fetchone() is None:
                         cursor.execute(sql('''
-                            INSERT INTO exam_results (username, unit_number, score, type_accuracy, correct_count, total_questions)
-                            VALUES (?, ?, ?, ?, ?, ?)
+                            INSERT INTO exam_results (username, unit_number, score, type_accuracy, correct_count, total_questions, exam_date)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
                         '''), (
                             result['username'],
                             result['unit_number'],
                             result['score'],
                             result['type_accuracy'],
                             result['correct_count'],
-                            result['total_questions']
+                            result['total_questions'],
+                            result.get('exam_date')
                         ))
                         count += 1
                 except Exception:
@@ -1796,13 +1797,14 @@ async def import_database(token: str = "", file: UploadFile = File(...)):
                     '''), (item['username'], item['unit_number'], item['chinese'], item['english']))
                     if cursor.fetchone() is None:
                         cursor.execute(sql('''
-                            INSERT INTO incorrect_answers (username, unit_number, chinese, english)
-                            VALUES (?, ?, ?, ?)
+                            INSERT INTO incorrect_answers (username, unit_number, chinese, english, last_incorrect)
+                            VALUES (?, ?, ?, ?, ?)
                         '''), (
                             item['username'],
                             item['unit_number'],
                             item['chinese'],
-                            item['english']
+                            item['english'],
+                            item.get('last_incorrect')
                         ))
                         count += 1
                 except Exception:
