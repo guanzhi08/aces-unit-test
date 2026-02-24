@@ -1307,7 +1307,7 @@
                     
                     const weekOfYear = getISOWeek(now);
 
-                    const calculatedUnit = weekOfYear + 64;
+                    const calculatedUnit = weekOfYear + 62;
                     const maxUnit = Math.max(...units.map(u => parseInt(u)));
                     console.log(`Calculated unit for week ${weekOfYear} is ${calculatedUnit}, max available unit is ${maxUnit}`);
                     targetUnit = String(Math.min(calculatedUnit, maxUnit));
