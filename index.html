@@ -2286,16 +2286,13 @@
             const html = `
             <div class="question-item" id="current-question">
                 <div class="chinese-word">${row.Chinese}</div>
-                <div style="color: #666; font-size: 14px; margin-bottom: 15px;">動詞 #${row._originalIndex}</div>
-                
                 <div class="answer-row" style="flex-direction: column; gap: 15px;">
                     <div style="display: flex; gap: 15px; width: 100%;">
                         <div class="answer-group" style="flex: 2;">
-                            <div class="answer-label">原形 (BaseForm)</div>
                             <input type="text" 
                                    class="answer-input verb-input ${activeVerbInput === 'base' ? 'active-verb-input' : ''}" 
                                    id="verb-base-answer" 
-                                   placeholder="Use virtual keyboard..."
+                                   placeholder="Base Form"
                                    value="${verbAnswersBase[index] || ''}"
                                    readonly
                                    onfocus="setActiveVerbInput('base')"
@@ -2305,11 +2302,10 @@
                                    spellcheck="false">
                         </div>
                         <div class="answer-group" style="flex: 2;">
-                            <div class="answer-label">過去式 (PastTense)</div>
                             <input type="text" 
                                    class="answer-input verb-input ${activeVerbInput === 'past' ? 'active-verb-input' : ''}" 
                                    id="verb-past-answer" 
-                                   placeholder="Use virtual keyboard..."
+                                   placeholder="Past Tense"
                                    value="${verbAnswersPast[index] || ''}"
                                    readonly
                                    onfocus="setActiveVerbInput('past')"
@@ -2318,10 +2314,10 @@
                                    autocapitalize="off"
                                    spellcheck="false">
                         </div>
-                        <div class="answer-group submit-group" style="display: flex; flex-direction: column; justify-content: flex-end;">
-                            <div class="answer-label">${index + 1}/${verbData.length}</div>
+                        <div class="answer-group submit-group" style="display: flex; flex-direction: column; justify-content: flex-end;">                            
                             <button onclick="submitVerbExam()" class="submit-btn">交卷</button>
                         </div>
+                        <div class="answer-label">${index + 1}/${verbData.length}</div>
                     </div>
                 </div>
                 
