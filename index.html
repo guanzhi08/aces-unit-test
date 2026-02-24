@@ -551,16 +551,16 @@
             <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">排行</button>            
         </div>
         <div style="margin-top: 10px;">
-            <label for="verbStart">動詞範圍:</label>
+            <label id="labelVerbStart" for="verbStart">Verb:</label>
             <select id="verbStart">
                 <option value="1">1</option>
             </select>
-            <label for="verbEnd">~</label>
+            <label id="labelVerbEnd" for="verbEnd">~</label>
             <select id="verbEnd">
                 <option value="101">101</option>
             </select>
-            <button onclick="showVerbTable()" id="verbTableBtn" style="background-color: #673AB7;">動詞表</button>
-            <button onclick="startVerbExam()" id="verbExamBtn" style="background-color: #9C27B0;">動詞考試</button>
+            <button onclick="showVerbTable()" id="verbTableBtn" style="background-color: #673AB7;">詞表</button>
+            <button onclick="startVerbExam()" id="verbExamBtn" style="background-color: #9C27B0;">考試</button>
 
             <!-- ADMIN_BUTTON_PLACEHOLDER -->            
         </div>
@@ -701,7 +701,7 @@
 
         // Show or hide exam-related UI based on whether the user is authenticated
         function updateAuthUI(authenticated) {
-            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea','rankingBtn','incorrectExamBtn'];
+            const idsToShow = ['startBtn','showTableBtn','historyBtn','resetBtn','labelUnit','unitNumber','labelQuestionCount','questionCount','examArea','rankingBtn','incorrectExamBtn','verbTableBtn','verbExamBtn','verbStart','verbEnd','labelVerbStart','labelVerbEnd'];
             idsToShow.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
