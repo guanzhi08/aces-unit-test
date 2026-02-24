@@ -1360,8 +1360,8 @@
         }
 
         function normalizeText(text) {
-            // Normalize: lowercase, trim, remove extra spaces
-            return text.toLowerCase().trim().replace(/\s+/g, ' ');
+            // Normalize: lowercase, trim, remove extra spaces, treat é as e
+            return text.toLowerCase().trim().replace(/\s+/g, ' ').replace(/é/g, 'e');
         }
 
         function startExam() {
