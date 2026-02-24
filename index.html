@@ -143,6 +143,10 @@
         .answer-input:disabled {
             background-color: #f5f5f5;
         }
+        .answer-input.active-verb-input {
+            border-color: #9C27B0;
+            box-shadow: 0 0 5px rgba(156, 39, 176, 0.5);
+        }
         .type-select {
             width: 100%;
             padding: 15px;
@@ -540,12 +544,24 @@
                 <option value="10">10</option>
                 <option value="ALL">ALL</option>
             </select>
-            <button onclick="showVocabularyTable()" id="showTableBtn">單字表</button>
-            <button onclick="startExam()" id="startBtn">模擬考</button>
-            <button onclick="startIncorrectExam()" id="incorrectExamBtn" style="background-color: #FF9800;">錯字練習</button>
-            <button onclick="resetExam()" id="resetBtn">重置</button>
-            <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">成績曲線</button>
-            <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">單元排行</button>
+            <button onclick="showVocabularyTable()" id="showTableBtn">字表</button>
+            <button onclick="startExam()" id="startBtn">考試</button>
+            <button onclick="startIncorrectExam()" id="incorrectExamBtn" style="background-color: #FF9800;">錯題</button>
+            <button onclick="showScoreCurve()" id="historyBtn" class="history-btn">曲線</button>
+            <button onclick="showUnitRanking()" id="rankingBtn" class="history-btn">排行</button>            
+        </div>
+        <div style="margin-top: 10px;">
+            <label for="verbStart">動詞範圍:</label>
+            <select id="verbStart">
+                <option value="1">1</option>
+            </select>
+            <label for="verbEnd">~</label>
+            <select id="verbEnd">
+                <option value="101">101</option>
+            </select>
+            <button onclick="showVerbTable()" id="verbTableBtn" style="background-color: #673AB7;">動詞表</button>
+            <button onclick="startVerbExam()" id="verbExamBtn" style="background-color: #9C27B0;">動詞考試</button>
+
             <!-- ADMIN_BUTTON_PLACEHOLDER -->            
         </div>
     </div>
@@ -560,6 +576,12 @@
         let WORD_TYPES = [];
         // Use absolute path to avoid requests being prefixed by subpaths (e.g. /admin)
         const CSV_FILE = '/ACES-S5-Unit.csv';
+        const VERB_CSV_FILE = '/ACES-S5-Verbs.csv';
+        let verbData = [];
+        let verbAnswersBase = [];
+        let verbAnswersPast = [];
+        let isVerbExam = false;
+        let activeVerbInput = 'base'; // 'base' or 'past'
         const API_BASE = '';  // Empty for same-origin, or set to 'http://localhost:8000' if needed
         let shuffledPool = [];
         let poolIndex = 0;
@@ -568,6 +590,7 @@
         // Load available units and saved username on page load
         window.addEventListener('DOMContentLoaded', function() {
             loadAvailableUnits();
+            loadVerbSelects();
             // Load saved username from localStorage
             const savedUsername = localStorage.getItem('acesUsername');
             if (savedUsername) {
@@ -1429,7 +1452,7 @@
                     userTypes = new Array(currentData.length).fill('');
                     currentIndex = 0;
                     
-                    document.getElementById('startBtn').textContent = '重出題';
+                    document.getElementById('startBtn').textContent = '重出';
                     
                     showQuestion(0);
                 })
@@ -1519,7 +1542,7 @@
                 userTypes = new Array(currentData.length).fill('');
                 currentIndex = 0;
                 
-                document.getElementById('incorrectExamBtn').textContent = '重出題';
+                document.getElementById('incorrectExamBtn').textContent = '重出';
                 
                 showQuestion(0);
             } catch (error) {
@@ -1870,6 +1893,12 @@
             userAnswers = [];
             userTypes = [];
             currentIndex = 0;
+            // Reset verb exam state
+            verbData = [];
+            verbAnswersBase = [];
+            verbAnswersPast = [];
+            isVerbExam = false;
+            activeVerbInput = 'base';
             document.getElementById('examArea').innerHTML = '';
             document.getElementById('startBtn').textContent = '模擬考';
             const incorrectBtn = document.getElementById('incorrectExamBtn');
@@ -1993,6 +2022,73 @@
                 });
         }
 
+        function showVerbTable() {
+            const startNum = parseInt(document.getElementById('verbStart').value);
+            const endNum = parseInt(document.getElementById('verbEnd').value);
+            
+            fetch(VERB_CSV_FILE)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Verb CSV file not found.');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    const allVerbs = parseVerbCSV(text);
+                    // Filter verbs in range (1-based indexing)
+                    const filteredData = allVerbs.slice(startNum - 1, endNum);
+                    
+                    if (filteredData.length === 0) {
+                        alert('No verb data found in the selected range');
+                        return;
+                    }
+                    
+                    // Generate table HTML
+                    let tableHTML = `
+                    <div style="background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <h2 style="text-align: center; color: #9C27B0; margin-bottom: 20px;">動詞表 (#${startNum} - #${endNum})</h2>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                            <thead>
+                                <tr style="background-color: #9C27B0; color: white;">
+                                    <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 50px;">No.</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">中文</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">原形</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">過去式</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">過去分詞</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                    
+                    filteredData.forEach((row, index) => {
+                        const bgColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+                        const baseForm = (row.BaseForm || '').replace(/'/g, "\\'");
+                        const pastTense = (row.PastTense || '').replace(/'/g, "\\'");
+                        const pastParticiple = (row.PastParticiple || '').replace(/'/g, "\\'");
+                        tableHTML += `
+                            <tr style="background-color: ${bgColor};">
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${row._originalIndex}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${row.Chinese}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;"><button onclick="pronounceWord('${baseForm}')" style="background-color: #007bff; color: white; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 10px;">🔊</button> ${row.BaseForm}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;"><button onclick="pronounceWord('${pastTense}')" style="background-color: #007bff; color: white; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 10px;">🔊</button> ${row.PastTense}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${row.PastParticiple ? `<button onclick="pronounceWord('${pastParticiple}')" style="background-color: #007bff; color: white; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 10px;">🔊</button> ${row.PastParticiple}` : ''}</td>
+                            </tr>`;
+                    });
+
+                    tableHTML += `
+                            </tbody>
+                        </table>
+                        <div style="text-align: center;">
+                            <button onclick="resetExam()" style="background-color: #9C27B0; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">Close Table</button>
+                        </div>
+                    </div>`;
+
+                    document.getElementById('examArea').innerHTML = tableHTML;
+                })
+                .catch(error => {
+                    alert(error.message);
+                });
+        }
+
         function pronounceWord(word) {
             if ('speechSynthesis' in window) {
                 // Cancel any ongoing speech
@@ -2007,6 +2103,321 @@
             } else {
                 alert('Sorry, your browser does not support text-to-speech.');
             }
+        }
+
+        // ========== VERB EXAM FUNCTIONS ==========
+        function loadVerbSelects() {
+            fetch(VERB_CSV_FILE)
+                .then(response => response.text())
+                .then(text => {
+                    const lines = text.split('\n').filter(line => line.trim());
+                    const count = lines.length - 1; // Exclude header
+                    
+                    const startSelect = document.getElementById('verbStart');
+                    const endSelect = document.getElementById('verbEnd');
+                    
+                    startSelect.innerHTML = '';
+                    endSelect.innerHTML = '';
+                    
+                    for (let i = 1; i <= count; i++) {
+                        startSelect.innerHTML += `<option value="${i}">${i}</option>`;
+                        endSelect.innerHTML += `<option value="${i}">${i}</option>`;
+                    }
+                    
+                    // Set end to last by default
+                    endSelect.value = count;
+                })
+                .catch(err => console.error('Failed to load verb selects:', err));
+        }
+
+        function parseVerbCSV(text) {
+            const lines = text.split('\n').filter(line => line.trim());
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                const row = {};
+                headers.forEach((header, idx) => {
+                    row[header] = (values[idx] || '').trim();
+                });
+                row._originalIndex = i; // 1-based verb number
+                data.push(row);
+            }
+            return data;
+        }
+
+        function startVerbExam() {
+            const startNum = parseInt(document.getElementById('verbStart').value);
+            const endNum = parseInt(document.getElementById('verbEnd').value);
+            
+            if (startNum > endNum) {
+                alert('開始編號不能大於結束編號');
+                return;
+            }
+            
+            fetch(VERB_CSV_FILE)
+                .then(response => response.text())
+                .then(text => {
+                    const allVerbs = parseVerbCSV(text);
+                    // Filter verbs in range (1-based indexing)
+                    verbData = allVerbs.slice(startNum - 1, endNum);
+                    
+                    if (verbData.length === 0) {
+                        alert('無法載入動詞資料');
+                        return;
+                    }
+                    
+                    // Shuffle the verb data
+                    verbData = shuffleArray([...verbData]);
+                    
+                    // Initialize answer arrays
+                    verbAnswersBase = new Array(verbData.length).fill('');
+                    verbAnswersPast = new Array(verbData.length).fill('');
+                    currentIndex = 0;
+                    isVerbExam = true;
+                    
+                    showVerbQuestion(0);
+                })
+                .catch(err => {
+                    alert('載入動詞檔案失敗: ' + err.message);
+                });
+        }
+
+        function showVerbQuestion(index) {
+            if (index < 0 || index >= verbData.length) return;
+            
+            currentIndex = index;
+            const row = verbData[index];
+            
+            const html = `
+            <div class="question-item" id="current-question">
+                <div class="chinese-word">${row.Chinese}</div>
+                <div style="color: #666; font-size: 14px; margin-bottom: 15px;">動詞 #${row._originalIndex}</div>
+                
+                <div class="answer-row" style="flex-direction: column; gap: 15px;">
+                    <div style="display: flex; gap: 15px; width: 100%;">
+                        <div class="answer-group" style="flex: 2;">
+                            <div class="answer-label">原形 (BaseForm)</div>
+                            <input type="text" 
+                                   class="answer-input verb-input ${activeVerbInput === 'base' ? 'active-verb-input' : ''}" 
+                                   id="verb-base-answer" 
+                                   placeholder="Use virtual keyboard..."
+                                   value="${verbAnswersBase[index] || ''}"
+                                   readonly
+                                   onfocus="setActiveVerbInput('base')"
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false">
+                        </div>
+                        <div class="answer-group" style="flex: 2;">
+                            <div class="answer-label">過去式 (PastTense)</div>
+                            <input type="text" 
+                                   class="answer-input verb-input ${activeVerbInput === 'past' ? 'active-verb-input' : ''}" 
+                                   id="verb-past-answer" 
+                                   placeholder="Use virtual keyboard..."
+                                   value="${verbAnswersPast[index] || ''}"
+                                   readonly
+                                   onfocus="setActiveVerbInput('past')"
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false">
+                        </div>
+                        <div class="answer-group submit-group" style="display: flex; flex-direction: column; justify-content: flex-end;">
+                            <div class="answer-label">${index + 1}/${verbData.length}</div>
+                            <button onclick="submitVerbExam()" class="submit-btn">交卷</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="virtual-keyboard">
+                    <div class="keyboard-row">
+                        <div class="key letter-key" onclick="typeVerbKey('q')">q</div>
+                        <div class="key letter-key" onclick="typeVerbKey('w')">w</div>
+                        <div class="key letter-key" onclick="typeVerbKey('e')">e</div>
+                        <div class="key letter-key" onclick="typeVerbKey('r')">r</div>
+                        <div class="key letter-key" onclick="typeVerbKey('t')">t</div>
+                        <div class="key letter-key" onclick="typeVerbKey('y')">y</div>
+                        <div class="key letter-key" onclick="typeVerbKey('u')">u</div>
+                        <div class="key letter-key" onclick="typeVerbKey('i')">i</div>
+                        <div class="key letter-key" onclick="typeVerbKey('o')">o</div>
+                        <div class="key letter-key" onclick="typeVerbKey('p')">p</div>
+                    </div>
+                    <div class="keyboard-row">
+                        <div class="key letter-key" onclick="typeVerbKey('a')">a</div>
+                        <div class="key letter-key" onclick="typeVerbKey('s')">s</div>
+                        <div class="key letter-key" onclick="typeVerbKey('d')">d</div>
+                        <div class="key letter-key" onclick="typeVerbKey('f')">f</div>
+                        <div class="key letter-key" onclick="typeVerbKey('g')">g</div>
+                        <div class="key letter-key" onclick="typeVerbKey('h')">h</div>
+                        <div class="key letter-key" onclick="typeVerbKey('j')">j</div>
+                        <div class="key letter-key" onclick="typeVerbKey('k')">k</div>
+                        <div class="key letter-key" onclick="typeVerbKey('l')">l</div>
+                    </div>
+                    <div class="keyboard-row">
+                        <div class="key shift" onclick="toggleShift()" id="shift-key">Shift</div>
+                        <div class="key letter-key" onclick="typeVerbKey('z')">z</div>
+                        <div class="key letter-key" onclick="typeVerbKey('x')">x</div>
+                        <div class="key letter-key" onclick="typeVerbKey('c')">c</div>
+                        <div class="key letter-key" onclick="typeVerbKey('v')">v</div>
+                        <div class="key letter-key" onclick="typeVerbKey('b')">b</div>
+                        <div class="key letter-key" onclick="typeVerbKey('n')">n</div>
+                        <div class="key letter-key" onclick="typeVerbKey('m')">m</div>
+                        <div class="key special" onclick="verbBackspace()">⌫ Back</div>
+                    </div>
+                    <div class="keyboard-row">
+                        <div class="key" onclick="typeVerbKey('(')">(</div>
+                        <div class="key" onclick="typeVerbKey(')')">)</div>
+                        <div class="key" onclick="typeVerbKey('\\'')">\'</div>
+                        <div class="key" onclick="typeVerbKey('/')">/</div>
+                        <div class="key space" onclick="typeVerbKey(' ')">Space</div>
+                        <div class="key nav-btn ${index === 0 ? 'disabled' : ''}" onclick="previousVerbQuestion()"><</div>
+                        <div class="key nav-btn ${index === verbData.length - 1 ? 'disabled' : ''}" onclick="nextVerbQuestion()">></div>
+                    </div>
+                </div>
+            </div>`;
+            
+            document.getElementById('examArea').innerHTML = html;
+            updateVerbInputHighlight();
+        }
+
+        function setActiveVerbInput(type) {
+            activeVerbInput = type;
+            updateVerbInputHighlight();
+        }
+
+        function updateVerbInputHighlight() {
+            const baseInput = document.getElementById('verb-base-answer');
+            const pastInput = document.getElementById('verb-past-answer');
+            if (baseInput) {
+                baseInput.classList.toggle('active-verb-input', activeVerbInput === 'base');
+            }
+            if (pastInput) {
+                pastInput.classList.toggle('active-verb-input', activeVerbInput === 'past');
+            }
+        }
+
+        function typeVerbKey(char) {
+            const inputId = activeVerbInput === 'base' ? 'verb-base-answer' : 'verb-past-answer';
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            const charToInsert = shiftActive ? char.toUpperCase() : char;
+            input.value += charToInsert;
+            
+            // Save the answer
+            if (activeVerbInput === 'base') {
+                verbAnswersBase[currentIndex] = input.value;
+            } else {
+                verbAnswersPast[currentIndex] = input.value;
+            }
+            
+            // Reset shift after typing
+            if (shiftActive) {
+                shiftActive = false;
+                const shiftKey = document.getElementById('shift-key');
+                if (shiftKey) shiftKey.classList.remove('active');
+            }
+        }
+
+        function verbBackspace() {
+            const inputId = activeVerbInput === 'base' ? 'verb-base-answer' : 'verb-past-answer';
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            input.value = input.value.slice(0, -1);
+            
+            // Save the answer
+            if (activeVerbInput === 'base') {
+                verbAnswersBase[currentIndex] = input.value;
+            } else {
+                verbAnswersPast[currentIndex] = input.value;
+            }
+        }
+
+        function saveVerbAnswer(type, value) {
+            if (type === 'base') {
+                verbAnswersBase[currentIndex] = value;
+            } else {
+                verbAnswersPast[currentIndex] = value;
+            }
+        }
+
+        function previousVerbQuestion() {
+            if (currentIndex === 0) return;
+            showVerbQuestion(currentIndex - 1);
+        }
+
+        function nextVerbQuestion() {
+            if (currentIndex >= verbData.length - 1) return;
+            showVerbQuestion(currentIndex + 1);
+        }
+
+        function submitVerbExam() {
+            if (verbData.length === 0) {
+                alert('請先開始動詞考試');
+                return;
+            }
+
+            let correctBase = 0;
+            let correctPast = 0;
+            let reviewHTML = '<div style="background-color: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
+            reviewHTML += '<h3 style="text-align: center; color: #9C27B0;">動詞考試結果</h3>';
+            
+            verbData.forEach((row, index) => {
+                const userBase = normalizeText(verbAnswersBase[index] || '');
+                const userPast = normalizeText(verbAnswersPast[index] || '');
+                const correctBaseForm = normalizeText(row.BaseForm || '');
+                const correctPastTense = normalizeText(row.PastTense || '');
+                
+                const isBaseCorrect = userBase === correctBaseForm;
+                const isPastCorrect = userPast === correctPastTense;
+                
+                if (isBaseCorrect) correctBase++;
+                if (isPastCorrect) correctPast++;
+                
+                const bothCorrect = isBaseCorrect && isPastCorrect;
+                const statusColor = bothCorrect ? '#28a745' : '#dc3545';
+                const bgColor = bothCorrect ? '#d4edda' : '#f8d7da';
+                
+                reviewHTML += `
+                <div style="padding: 15px; margin-bottom: 10px; border-left: 4px solid ${statusColor}; background-color: ${bgColor};">
+                    <div><strong>Q${index + 1} (#${row._originalIndex}):</strong> ${row.Chinese}</div>
+                    <div>原形: <strong>${verbAnswersBase[index] || '(未作答)'}</strong> ${isBaseCorrect ? '✓' : '✗'}
+                        ${!isBaseCorrect ? `<span style="color: #28a745;">(正確: ${row.BaseForm})</span>` : ''}
+                    </div>
+                    <div>過去式: <strong>${verbAnswersPast[index] || '(未作答)'}</strong> ${isPastCorrect ? '✓' : '✗'}
+                        ${!isPastCorrect ? `<span style="color: #28a745;">(正確: ${row.PastTense})</span>` : ''}
+                    </div>
+                </div>`;
+            });
+            
+            reviewHTML += '</div>';
+            
+            const totalQuestions = verbData.length;
+            const totalAnswers = totalQuestions * 2;
+            const totalCorrect = correctBase + correctPast;
+            const percentage = Math.round((totalCorrect / totalAnswers) * 100);
+            
+            let scoreClass = 'low';
+            if (percentage >= 80) scoreClass = '';
+            else if (percentage >= 60) scoreClass = 'medium';
+            
+            const resultHTML = `
+            <div style="background-color: #fff; padding: 30px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h2 style="color: #9C27B0;">動詞考試完成!</h2>
+                <div class="final-score ${scoreClass}">${percentage}%</div>
+                <p>原形正確: ${correctBase}/${totalQuestions}</p>
+                <p>過去式正確: ${correctPast}/${totalQuestions}</p>
+                <p>總計: ${totalCorrect}/${totalAnswers}</p>
+                <button onclick="resetExam()" style="margin-top: 15px; padding: 10px 30px; font-size: 16px;">重新開始</button>
+            </div>
+            ${reviewHTML}`;
+            
+            document.getElementById('examArea').innerHTML = resultHTML;
+            isVerbExam = false;
         }
     </script>
 </body>
