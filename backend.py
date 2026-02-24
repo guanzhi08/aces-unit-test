@@ -156,6 +156,18 @@ def init_db():
                 last_incorrect TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS incorrect_verb_answers (
+                id SERIAL PRIMARY KEY,
+                username TEXT,
+                chinese TEXT NOT NULL,
+                base_form TEXT NOT NULL,
+                past_tense TEXT NOT NULL,
+                base_wrong BOOLEAN DEFAULT FALSE,
+                past_wrong BOOLEAN DEFAULT FALSE,
+                last_incorrect TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         # Users table for account creation
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -208,6 +220,18 @@ def init_db():
                 unit_number TEXT NOT NULL,
                 chinese TEXT NOT NULL,
                 english TEXT NOT NULL,
+                last_incorrect TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS incorrect_verb_answers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                chinese TEXT NOT NULL,
+                base_form TEXT NOT NULL,
+                past_tense TEXT NOT NULL,
+                base_wrong INTEGER DEFAULT 0,
+                past_wrong INTEGER DEFAULT 0,
                 last_incorrect TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -292,6 +316,15 @@ class IncorrectItemUpdate(BaseModel):
     chinese: Optional[str] = None
     english: Optional[str] = None
     unit_number: Optional[str] = None
+
+
+class IncorrectVerbItem(BaseModel):
+    username: Optional[str] = None
+    chinese: str
+    base_form: str
+    past_tense: str
+    base_wrong: bool = False
+    past_wrong: bool = False
 
 
 @app.post("/api/results", response_model=ExamResultResponse)
@@ -452,6 +485,135 @@ async def delete_incorrect(item_id: int):
         raise HTTPException(status_code=404, detail="Record not found")
     
     cursor.execute(sql('DELETE FROM incorrect_answers WHERE id = ?'), (item_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Record deleted successfully", "id": item_id}
+
+
+@app.post('/api/incorrect-verbs')
+async def save_incorrect_verbs(items: List[IncorrectVerbItem]):
+    """Save incorrect verb answers (accepts a list of incorrect verb items)."""
+    if not items:
+        return {"saved": 0}
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    saved = 0
+    for it in items:
+        try:
+            cursor.execute(sql('''
+                INSERT INTO incorrect_verb_answers (username, chinese, base_form, past_tense, base_wrong, past_wrong)
+                VALUES (?, ?, ?, ?, ?, ?)
+            '''), (it.username or '', it.chinese, it.base_form, it.past_tense, it.base_wrong, it.past_wrong))
+            saved += 1
+        except Exception:
+            continue
+
+    conn.commit()
+    conn.close()
+    return {"saved": saved}
+
+
+@app.get('/api/incorrect-verbs')
+async def get_incorrect_verbs(username: Optional[str] = None, limit: int = 1000):
+    """Return incorrect verb answers (optionally filtered by username)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if username:
+        cursor.execute(sql('''
+            SELECT * FROM incorrect_verb_answers WHERE username = ? ORDER BY last_incorrect DESC LIMIT ?
+        '''), (username, limit))
+    else:
+        cursor.execute(sql('SELECT * FROM incorrect_verb_answers ORDER BY last_incorrect DESC LIMIT ?'), (limit,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+    for row in rows:
+        result.append({
+            'id': row['id'],
+            'username': row['username'],
+            'Chinese': row['chinese'],
+            'BaseForm': row['base_form'],
+            'PastTense': row['past_tense'],
+            'base_wrong': row['base_wrong'],
+            'past_wrong': row['past_wrong'],
+            'last_incorrect': format_exam_date(row['last_incorrect'])
+        })
+    return result
+
+
+class IncorrectVerbItemUpdate(BaseModel):
+    chinese: Optional[str] = None
+    base_form: Optional[str] = None
+    past_tense: Optional[str] = None
+
+
+@app.put('/api/incorrect-verbs/{item_id}')
+async def update_incorrect_verb(item_id: int, update: IncorrectVerbItemUpdate):
+    """Update an incorrect verb answer record."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if record exists
+    cursor.execute(sql('SELECT * FROM incorrect_verb_answers WHERE id = ?'), (item_id,))
+    existing = cursor.fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    # Build update query dynamically
+    updates = []
+    values = []
+    if update.chinese is not None:
+        updates.append('chinese = ?')
+        values.append(update.chinese)
+    if update.base_form is not None:
+        updates.append('base_form = ?')
+        values.append(update.base_form)
+    if update.past_tense is not None:
+        updates.append('past_tense = ?')
+        values.append(update.past_tense)
+    
+    if updates:
+        values.append(item_id)
+        query = f'UPDATE incorrect_verb_answers SET {", ".join(updates)} WHERE id = ?'
+        cursor.execute(sql(query), tuple(values))
+        conn.commit()
+    
+    # Fetch updated record
+    cursor.execute(sql('SELECT * FROM incorrect_verb_answers WHERE id = ?'), (item_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    return {
+        'id': row['id'],
+        'username': row['username'],
+        'Chinese': row['chinese'],
+        'BaseForm': row['base_form'],
+        'PastTense': row['past_tense'],
+        'base_wrong': row['base_wrong'],
+        'past_wrong': row['past_wrong'],
+        'last_incorrect': format_exam_date(row['last_incorrect'])
+    }
+
+
+@app.delete('/api/incorrect-verbs/{item_id}')
+async def delete_incorrect_verb(item_id: int):
+    """Delete an incorrect verb answer record."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if record exists
+    cursor.execute(sql('SELECT id FROM incorrect_verb_answers WHERE id = ?'), (item_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    cursor.execute(sql('DELETE FROM incorrect_verb_answers WHERE id = ?'), (item_id,))
     conn.commit()
     conn.close()
     
@@ -1134,6 +1296,7 @@ async def read_admin_dashboard():
     # Inject admin button and logout functionality
         admin_button = '''<button id="recordsBtn" style="background-color: #9C27B0;">考試紀錄</button>
             <button id="incorrectMgmtBtn" style="background-color: #FF9800;">錯字管理</button>
+            <button id="incorrectVerbMgmtBtn" style="background-color: #E91E63;">錯詞管理</button>
             <button id="userMgmtBtn" style="background-color: #2196F3;">使用者管理</button>
             <button onclick="exportDatabase()" style="background-color: #607D8B;">匯出資料庫</button>
             <button onclick="document.getElementById('importFileInput').click()" style="background-color: #795548;">匯入資料庫</button>
@@ -1158,7 +1321,7 @@ async def read_admin_dashboard():
                     window.location.href = '/admin';
                 } else {
                     // Hide non-admin controls when viewing as admin
-                    const hideIds = ['unitNumber','questionCount','showTableBtn','startBtn','historyBtn','resetBtn','incorrectExamBtn'];
+                    const hideIds = ['unitNumber','questionCount','showTableBtn','startBtn','historyBtn','resetBtn','incorrectExamBtn','verbTableBtn','verbExamBtn','verbIncorrectExamBtn','verbStart','verbEnd','labelVerbStart','labelVerbEnd'];
                     hideIds.forEach(id => {
                         try {
                             const el = document.getElementById(id);
@@ -1235,6 +1398,13 @@ async def read_admin_dashboard():
                             iBtn.addEventListener('click', function(e) {
                                 e.preventDefault();
                                 showIncorrectManagement();
+                            });
+                        }
+                        const ivBtn = document.getElementById('incorrectVerbMgmtBtn');
+                        if (ivBtn) {
+                            ivBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                showIncorrectVerbManagement();
                             });
                         }
                     } catch (e) { console.error('Error attaching admin button handlers', e); }
@@ -1517,6 +1687,175 @@ async def read_admin_dashboard():
             }
         }
 
+        // Verb Incorrect Management
+        let allIncorrectVerbRecords = [];
+
+        async function showIncorrectVerbManagement(filterUser = '') {
+            try {
+                let url = '/api/incorrect-verbs?limit=2000';
+                if (filterUser) url += '&username=' + encodeURIComponent(filterUser);
+                
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Failed to fetch incorrect verb records');
+                allIncorrectVerbRecords = await resp.json();
+                
+                // Get unique users for filters
+                const users = [...new Set(allIncorrectVerbRecords.map(r => r.username))].sort();
+                
+                const html = `
+                <div class="records-container">
+                    <h3>📝 錯詞管理</h3>
+                    <div class="records-toolbar">
+                        <div>
+                            <label>篩選用戶:</label>
+                            <select id="incorrectVerbFilterUser" onchange="filterIncorrectVerbRecords()">
+                                <option value="">全部用戶</option>
+                                ${users.map(u => `<option value="${u}" ${u === filterUser ? 'selected' : ''}>${u}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <span id="incorrectVerbRecordCount">共 ${allIncorrectVerbRecords.length} 筆紀錄</span>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="records-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用戶</th>
+                                    <th>中文</th>
+                                    <th>原形</th>
+                                    <th>過去式</th>
+                                    <th>原形錯誤</th>
+                                    <th>過去式錯誤</th>
+                                    <th>時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incorrectVerbRecordsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="resetExam()" style="background-color: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 4px;">關閉</button>
+                    </div>
+                </div>`;
+                
+                document.getElementById('examArea').innerHTML = html;
+                renderIncorrectVerbRecordsTable(allIncorrectVerbRecords);
+            } catch (e) {
+                console.error('Error loading incorrect verb records:', e);
+                alert('無法載入錯詞紀錄');
+            }
+        }
+
+        function renderIncorrectVerbRecordsTable(records) {
+            const tbody = document.getElementById('incorrectVerbRecordsBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = records.map(r => `
+                <tr id="incorrect-verb-row-${r.id}">
+                    <td>${r.id}</td>
+                    <td>${r.username || ''}</td>
+                    <td id="incorrect-verb-cell-chinese-${r.id}">${r.Chinese || ''}</td>
+                    <td id="incorrect-verb-cell-base-${r.id}">${r.BaseForm || ''}</td>
+                    <td id="incorrect-verb-cell-past-${r.id}">${r.PastTense || ''}</td>
+                    <td>${r.base_wrong || 0}</td>
+                    <td>${r.past_wrong || 0}</td>
+                    <td>${r.last_incorrect || ''}</td>
+                    <td id="incorrect-verb-cell-actions-${r.id}">
+                        <button class="btn-edit" onclick="startEditIncorrectVerb(${r.id})">編輯</button>
+                        <button class="btn-delete" onclick="deleteIncorrectVerb(${r.id})">刪除</button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('incorrectVerbRecordCount').textContent = `共 ${records.length} 筆紀錄`;
+        }
+
+        function filterIncorrectVerbRecords() {
+            const userFilter = document.getElementById('incorrectVerbFilterUser').value;
+            showIncorrectVerbManagement(userFilter);
+        }
+
+        function startEditIncorrectVerb(id) {
+            const record = allIncorrectVerbRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            document.getElementById(`incorrect-verb-cell-chinese-${id}`).innerHTML = 
+                `<input type="text" id="edit-incorrect-verb-chinese-${id}" value="${record.Chinese || ''}" style="width:80px;">`;
+            document.getElementById(`incorrect-verb-cell-base-${id}`).innerHTML = 
+                `<input type="text" id="edit-incorrect-verb-base-${id}" value="${record.BaseForm || ''}" style="width:80px;">`;
+            document.getElementById(`incorrect-verb-cell-past-${id}`).innerHTML = 
+                `<input type="text" id="edit-incorrect-verb-past-${id}" value="${record.PastTense || ''}" style="width:80px;">`;
+            document.getElementById(`incorrect-verb-cell-actions-${id}`).innerHTML = 
+                `<button class="btn-save" onclick="saveEditIncorrectVerb(${id})">儲存</button>
+                 <button class="btn-cancel" onclick="cancelEditIncorrectVerb(${id})">取消</button>`;
+        }
+
+        function cancelEditIncorrectVerb(id) {
+            const record = allIncorrectVerbRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            document.getElementById(`incorrect-verb-cell-chinese-${id}`).innerHTML = record.Chinese || '';
+            document.getElementById(`incorrect-verb-cell-base-${id}`).innerHTML = record.BaseForm || '';
+            document.getElementById(`incorrect-verb-cell-past-${id}`).innerHTML = record.PastTense || '';
+            document.getElementById(`incorrect-verb-cell-actions-${id}`).innerHTML = 
+                `<button class="btn-edit" onclick="startEditIncorrectVerb(${id})">編輯</button>
+                 <button class="btn-delete" onclick="deleteIncorrectVerb(${id})">刪除</button>`;
+        }
+
+        async function saveEditIncorrectVerb(id) {
+            const chinese = document.getElementById(`edit-incorrect-verb-chinese-${id}`).value;
+            const baseForm = document.getElementById(`edit-incorrect-verb-base-${id}`).value;
+            const pastTense = document.getElementById(`edit-incorrect-verb-past-${id}`).value;
+            
+            try {
+                const resp = await fetch(`/api/incorrect-verbs/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chinese: chinese,
+                        base_form: baseForm,
+                        past_tense: pastTense
+                    })
+                });
+                
+                if (!resp.ok) throw new Error('Failed to update');
+                
+                const updated = await resp.json();
+                const index = allIncorrectVerbRecords.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    allIncorrectVerbRecords[index] = updated;
+                }
+                
+                // Re-render
+                const userFilter = document.getElementById('incorrectVerbFilterUser')?.value || '';
+                showIncorrectVerbManagement(userFilter);
+            } catch (e) {
+                console.error('Error updating incorrect verb record:', e);
+                alert('更新失敗');
+            }
+        }
+
+        async function deleteIncorrectVerb(id) {
+            if (!confirm('確定要刪除這筆錯詞紀錄嗎？')) return;
+            
+            try {
+                const resp = await fetch(`/api/incorrect-verbs/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('Failed to delete');
+                
+                allIncorrectVerbRecords = allIncorrectVerbRecords.filter(r => r.id !== id);
+                
+                // Re-render
+                const userFilter = document.getElementById('incorrectVerbFilterUser')?.value || '';
+                showIncorrectVerbManagement(userFilter);
+            } catch (e) {
+                console.error('Error deleting incorrect verb record:', e);
+                alert('刪除失敗');
+            }
+        }
+
         // Database Export/Import functions
         async function exportDatabase() {
             const token = localStorage.getItem('adminToken');
@@ -1708,6 +2047,22 @@ async def export_database(token: str = ""):
         } for row in rows
     ]
     
+    # Export incorrect_verb_answers
+    cursor.execute('SELECT * FROM incorrect_verb_answers ORDER BY id')
+    rows = cursor.fetchall()
+    export_data["tables"]["incorrect_verb_answers"] = [
+        {
+            "id": row['id'],
+            "username": row['username'],
+            "chinese": row['chinese'],
+            "base_form": row['base_form'],
+            "past_tense": row['past_tense'],
+            "base_wrong": row['base_wrong'],
+            "past_wrong": row['past_wrong'],
+            "last_incorrect": format_exam_date(row['last_incorrect'])
+        } for row in rows
+    ]
+    
     conn.close()
     
     # Return as downloadable JSON file
@@ -1810,6 +2165,34 @@ async def import_database(token: str = "", file: UploadFile = File(...)):
                 except Exception:
                     continue
             imported_counts["incorrect_answers"] = count
+        
+        # Import incorrect_verb_answers
+        if "incorrect_verb_answers" in import_data["tables"]:
+            count = 0
+            for item in import_data["tables"]["incorrect_verb_answers"]:
+                try:
+                    # Check for duplicate
+                    cursor.execute(sql('''
+                        SELECT id FROM incorrect_verb_answers 
+                        WHERE username = ? AND chinese = ? AND base_form = ?
+                    '''), (item['username'], item['chinese'], item['base_form']))
+                    if cursor.fetchone() is None:
+                        cursor.execute(sql('''
+                            INSERT INTO incorrect_verb_answers (username, chinese, base_form, past_tense, base_wrong, past_wrong, last_incorrect)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        '''), (
+                            item['username'],
+                            item['chinese'],
+                            item['base_form'],
+                            item['past_tense'],
+                            item.get('base_wrong', 0),
+                            item.get('past_wrong', 0),
+                            item.get('last_incorrect')
+                        ))
+                        count += 1
+                except Exception:
+                    continue
+            imported_counts["incorrect_verb_answers"] = count
         
         # Import admin_settings (update if key exists, insert if not)
         if "admin_settings" in import_data["tables"]:
