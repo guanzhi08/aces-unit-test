@@ -8,7 +8,7 @@ FastAPI backend for ACES Unit Test Practice
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -39,6 +39,14 @@ else:
     print(f"Using SQLite database: {DB_PATH}")
 
 app = FastAPI(title="ACES Unit Test API")
+
+@app.get("/health")
+def health():
+    return Response(content="OK", status_code=200)
+
+@app.head("/health")
+def health_check_head():
+    return Response(status_code=200)
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -2236,7 +2244,6 @@ async def read_file(filename: str):
     if os.path.exists(filename):
         return FileResponse(filename)
     raise HTTPException(status_code=404, detail="File not found")
-
 
 if __name__ == "__main__":
     import uvicorn
