@@ -444,4 +444,392 @@
 79,一個規則,cn,a rule
 79,木頭,ucn,wood
 79,保護,v,to protect
-
+80,種植 / 養育,v,to raise
+80,一種農作物,cn,a crop
+80,執行,v,to enforce
+80,一位公民 / 市民,cn,a citizen
+80,一位會計師,cn,an accountant
+80,一位女演員,cn,an actress
+80,一位建築師,cn,an architect
+80,一位藝術家,cn,an artist
+80,一位太空人,cn,an astronaut
+80,一位作者,cn,an author
+80,一位銀行家,cn,a banker
+80,一位理髮師,cn,a barber
+80,一位美容師,cn,a beautician
+80,一位美髮師,cn,a hairstylist
+80,一位商人(女性),cn,a businesswoman
+80,一位木匠,cn,a carpenter
+80,一位文職公務員,cn phr,a civil servant
+80,一位電腦程式設計師,cn phr,a computer programmer
+80,一位犯罪者,cn,a criminal
+80,一位舞蹈家,cn,a dancer
+80,一位偵探,cn,a detective
+80,一位音樂主持人,cn,a DJ
+80,一位工程師,cn,an engineer
+80,一位工人,cn phr,a factory worker
+80,一位服裝設計師,cn phr,a fashion designer
+80,一位農夫,cn,a farmer
+81,一位消防隊員,cn,a firefighter
+81,一位漁夫,cn,a fisherman
+81,一位空服人員,cn phr,a flight attendant
+81,一位算命師,cn phr,a fortune teller
+81,一位流氓,cn,a gangster
+81,一位清潔隊員,cn,a garbageman
+81,一位家庭主婦,cn,a housewife
+81,一位家庭主夫,cn,a househusband
+81,一位發明家,cn,an inventor
+81,一位記者,cn,a journalist
+81,一位律師,cn,a lawyer
+81,一位郵差,cn,a mailman
+81,一位經理,cn,a manager
+81,一位模特兒,cn,a model
+81,一位和尚 / 修士,cn,a monk
+81,一位音樂家,cn,a musician
+81,一位尼姑 / 修女,cn,a nun
+81,一位藥劑師,cn,a pharmacist
+81,一位攝影師,cn,a photographer
+81,一位飛行員,cn,a pilot
+81,一位警察,cn phr,a police officer / policeman
+81,一位警察(女性),cn,a policewoman
+81,一位政治家,cn,a politician
+81,一位神父 / 牧師,cn,a priest
+82,一位教授,cn,a professor
+82,一位新聞 / 雜誌記者,cn,a reporter
+82,一位推銷員,cn,a salesperson
+82,一位科學家,cn,a scientist
+82,一位秘書,cn,a secretary
+82,一位軍人,cn,a soldier
+82,一位間諜,cn,a spy
+82,一位計程車司機,cn phr,a taxi driver
+82,一位導遊,cn phr,a tour guide
+82,一位獸醫,cn,a veterinarian
+82,一位餐廳服務生,cn,a waiter / waitress
+82,一位作家,cn,a writer
+82,在…期間,conj,as
+82,一次心臟病發作,cn phr,a heart attack
+82,報告,v,to report
+82,幫某人算命,v phr,to tell your fortune
+82,預測 / 預言,v,to predict
+82,未來,cn,the future
+82,焚燒 / 燒 / 燙到,v,to burn
+82,一把槍,cn,a gun
+82,一位強盜 / 小偷,cn,a robber
+82,一個包裹,cn,a package
+82,爆胎,v phr,to get a flat tire
+83,昏倒,v,to faint
+83,一面鏡子,cn,a mirror
+83,把…切成薄片,v,to slice
+83,一桶,cn,a can (of paint)
+83,一把梯子,cn,a ladder
+83,一間貿易公司,cn phr,a trading company
+83,擁有,v,to own
+83,經營 / 管理,v,to manage
+83,經營 / 管理,v,to run (manage)
+83,設計,v,to design
+83,退休的,adj,retired
+83,指,v,to point
+83,兩個都不是,adj/pron/adv/conj,neither
+83,踩到,v phr,to step on (feet)
+83,一個櫥 / 碗櫥,cn,a cupboard
+83,撲克牌,ucn,poker
+83,殺死,v,to kill
+83,一個惡夢,cn,a nightmare
+83,在全世界,adv phr,all over the world
+83,幾乎 / 差一點,adv,almost
+83,追逐 / 追趕,v,to chase
+83,獅子吼叫,v,to roar
+83,一根香煙,cn,a cigarette
+83,探險 / 探索,v,to explore
+83,外太空,ucn phr,outer space
+83,故意地,adv phr,on purpose
+83,未來式,ucn phr,the future tense
+84,特別地,adv,especially
+84,一個計劃,cn,a plan
+84,接某人,v phr,to pick up SB
+84,東西,ucn,stuff
+84,書法,ucn,calligraphy
+84,治療,v,to treat (animals or people)
+84,進入,v,to enter
+84,一個選舉,cn,an election
+84,大概,adv,probably
+84,一定,adj/adv phr,for sure
+84,一個信封,cn,an envelope
+84,一個禮物,cn,a present
+84,一張成績單,cn phr,a report card
+84,明天,adv/cn,tomorrow
+84,快要 / 不久後,adv,soon
+84,以後,adv,later
+84,畢業,v,to graduate
+84,一個畢業旅行,cn phr,a graduation trip
+84,把…分開,v,to separate
+84,一個不定詞,cn,an infinitive
+84,燙(衣服),v,to iron
+84,現在 / 馬上,adv phr,right now
+85,馬上 / 立刻,adv phr,at once
+85,馬上 / 立刻,adv,immediately
+85,夏威夷,name,Hawaii
+85,永遠不會,adv,never (future tense)
+85,跟著,v,to follow
+85,放棄 / 停止,v,to quit
+85,介意,v,to mind
+85,考慮,v,to consider
+85,移過去一點,v phr,to move over
+85,(一個)夏令營,cn/ucn phr,(a) summer camp
+85,服務,v,to serve
+85,一位乘客,cn,a passenger
+85,潮濕的,adj,humid
+85,乾的,adj,dry
+85,有一天,adv,someday
+85,一篇作文,cn,a composition
+85,射,v,to shoot (basketball)
+85,運球,v,to dribble (basketball)
+85,玩帆船 / 航行,v,to sail
+85,推,v,to push
+85,一個罰球,cn phr,a free throw
+85,插花,v phr,to arrange flowers
+85,一個預報 / 預測,cn,a forecast
+85,按照 / 根據,prep phr,according to
+85,一個衛星,cn,a satellite
+85,資訊 / 資料,ucn,information
+86,義大利麵,ucn,spaghetti
+86,邁阿密,name,Miami
+86,台中,name,Taichung
+86,高雄,name,Kaohsiung
+86,拔(一顆牙),v,to pull (a tooth)
+86,科技,ucn,technology
+86,壓力,ucn,pressure
+86,向…借東西,v,to borrow
+86,弄短,v,to shorten
+86,一條橡皮筋,cn phr,a rubber band
+86,省略 / 去掉,v,to omit
+86,鳥叫,v,to chirp
+86,爬,v,to crawl
+86,一個平底鍋,cn,a pan
+86,(女生的)香水,ucn,perfume
+86,一張照片,cn,a photograph
+86,將/會,hv,will
+86,一個巧克力棒,cn phr,a candy bar
+86,遠足 / 健行,v,to hike
+86,偶遇,v,to pass
+86,一個瓶子,cn,a bottle
+86,結婚,v,to marry
+86,火星,name,Mars
+86,董事長,cn,the president (of a company)
+87,特定的,adj,definite
+87,一個時刻表,cn,a timetable
+87,國父紀念館,name,Sun Yatsen Memorial Hall
+87,一個經驗,cn,an experience
+87,最近地,adv,recently
+87,睡晚一點 / 晚起,v phr,to sleep in
+87,照亮,v,to shine
+87,明亮的,adj,bright
+87,決定,v,to decide
+87,反正 / 無論怎樣,adv,anyway
+87,太極,ucn,Tai-chi
+87,別人 / 其他一些,pcn,others
+87,一對(夫妻),cn,a couple
+87,一群,cn,a group
+87,彼此 / 互相,phr,each other
+87,象棋,ucn phr,Chinese chess
+87,圍棋,ucn,Go
+87,熱鬧的,adj,lively
+87,運動,v phr,to get exercise
+87,整個,adj/adv,whole
+87,拒絕,v,to refuse
+87,在某人家過夜,v phr,to sleep over
+87,整理床鋪,v phr,to make the bed
+87,擦,v,to wipe
+87,擺設餐具,v phr,to set the table
+87,一瓶 / 罐 / 杯飲料,cn,a drink
+87,表達 / 表示,v,to express
+88,一公斤,cn,a kilogram
+88,一本課本,cn,a textbook
+88,功夫,ucn phr,kung fu
+88,欺負,v phr,to pick on
+88,一…就…,adv phr,as soon as
+88,假裝,v,to pretend
+88,盯 / 瞪,v,to stare
+88,一位天使,cn,an angel
+88,好險 / 還好,adv,luckily
+88,儘快,adv phr,as soon as possible
+88,儘快,adv phr,as soon as you can
+88,忌妒的,adj,jealous
+88,開除,v,to fire
+88,一個預測,cn,a prediction
+88,考不及格 / 失敗,v,to fail
+88,一個主意,cn,an idea
+88,開(花),v,to bloom
+88,以前是 / 以前有,v phr,used to v
+88,一座大型體育場,cn,a stadium
+88,一座城鎮,cn,a town
+88,鄉下,cn/ucn,the countryside
+88,人口,ucn,population
+88,空地,ucn phr,open land
+88,很少的,adj,little
+88,一座摩天大樓,cn,a skyscraper
+88,一個系統,cn,a system
+88,不久後,adv phr,in a little while
+89,熬夜 / 然夜,v phr,to stay up (late)
+89,為…瘋狂,adj phr,crazy about
+89,一個藉口,cn,an excuse
+89,被卡住 / 被黏住,v phr,to get stuck
+89,一個戶外教學,cn phr,a field trip
+89,一個科學展覽,cn phr,a science fair
+89,成熟的,adj,ripe
+89,(一座)監獄,(cn)/ucn,(a) jail
+89,以前不是/現在是/以前沒有,v phr,didn't use to
+89,台南,name,Tainan
+89,尿尿,v,to pee
+89,吸,v,to suck
+89,一片尿布,cn,a diaper
+89,打保齡球,v,to bowl
+89,邀請人去約會,v phr,to ask for a date
+89,一場戰爭,cn,a war
+89,如果,conj,if
+89,讚美,v,to praise
+89,獎勵,v,to reward
+89,預期 / 期待,v,to expect
+89,提供,v,to offer
+89,不一定 / 看情況,phr,it depends
+89,一隻恐龍,cn,a dinosaur
+89,一座花園/菜園,cn,a garden
+89,紐約,name,New York
+89,一個派,cn,a pie
+89,還有 / 還是,adv,anymore
+89,再也不 / 不再,adv phr,not...anymore
+90,一個膽小鬼,cn,a chicken (coward)
+90,一隻小狗,cn,a puppy
+90,破壞規矩/犯規,v phr,to break the rules
+90,(一個)處罰,(cn)/ucn,(a) punishment
+90,被抓到,v phr,to get caught
+90,翹課,v phr,to skip class
+90,逃學,v phr,to skip school
+90,頂嘴,v phr,to talk back
+90,刷 / 用力擦,v,to scrub
+90,道歉,v,to apologize
+90,(文章的)一部份,cn,a passage
+90,在角落,prep phr,in the corner
+90,一個馬桶,cn,a toilet
+90,加倍,v phr,to double it
+90,一根棍子,cn,a stick
+90,亂丟垃圾,v,to litter
+90,一個小考,cn,a quiz
+90,一個藝術展覽,cn phr,an art exhibit
+90,一個才藝表演,cn phr,a talent show
+90,一個園遊會,cn,a fair
+90,一個集會,cn,an assembly
+90,一個機會,cn,a chance
+90,一個太空站,cn phr,a space station
+90,一個獎品,cn,a prize
+90,一隻袋鼠,cn,a kangaroo
+90,一座游泳池,cn phr,a swimming pool
+90,一下子,cn,a moment
+91,高興的 / 滿意的,adj,pleased
+91,一座大學,cn,a college
+91,一個封面,cn,a cover (of a book)
+91,一個惡魔,cn,a devil
+91,最近,adv phr,these days
+91,燒光 / 燒毀,v phr,to burn down
+91,一位超級模特兒,cn,a supermodel
+91,否則 / 要不然,adv,otherwise
+91,一位市長,cn,a mayor
+91,甚至 / 即使,adv phr,even if
+91,一個行星/星球,cn,a planet
+91,被用完了,v phr,to be used up
+91,一個未來真的有可能的事,cn phr,a real future possibility
+91,回收,v,to recycle
+91,倒,v,to dump
+91,一個數量,cn,a quantity
+91,比較多 / 多一點,phr,more + pcn/ucn
+91,比較少的,phr,fewer + pcn
+91,比較少的,phr,less + ucn
+91,花蓮,name,Hualien
+91,打屁股,v,to spank
+91,長袖的,adj,long-sleeve(d)
+91,取名,v,to name
+91,十億,cn,a billion
+91,一筆獎金 / 紅利,cn,a bonus
+92,一隻無尾熊,cn,a koala
+92,一座火山,cn,a volcano
+92,南非,name,South Africa
+92,可以喝的水,ucn phr,drinking water
+92,一種(旅行的)方式,cn,a way (to travel)
+92,一個人行道,cn,a sidewalk
+92,一個路邊攤,cn phr,a street vendor
+92,基隆,name,Keelung
+92,情緒化的,adj,moody
+92,猜 / 假設,v,to suppose
+92,負責任的,adj,responsible
+92,不負責任的,adj,irresponsible
+92,偶爾,adv phr,from time to time
+92,淺的,adj,shallow
+92,一個關門,cn,a gate
+92,一台拖拉機,cn,a tractor
+92,收費,v,to charge
+92,裝滿,v,to fill
+92,一個洞,cn,a hole
+92,波士頓,name,Boston
+92,趕時間,prep phr,in a hurry
+92,搭便車,v,to hitchhike
+92,一位老闆,cn,a boss
+92,一個獎勵 / 獎賞,cn,a reward
+92,準備,v,to prepare
+92,六福村,name,Leofoo Village
+92,一個遊樂園,cn phr,an amusement park
+93,確定地 / 的確,adv,definitely
+93,台灣中部,name,Central Taiwan
+93,一位筆友,cn phr,a pen pal
+93,現在完成式,ucn phr,the present perfect tense
+93,連接,v,to connect
+93,一個情況,cn,a situation
+93,結束 / 完成,pp,finished
+93,問,pp,asked
+93,吃,pp,eaten
+93,做,pp,done
+93,完成,v,to complete
+93,...了嗎 / 了沒有,adv,yet?
+93,還沒有,adv phr,not yet
+93,已經,adv,already
+93,拿走 / 帶去,pp,taken
+93,去了 / 走了,pp,gone
+93,駕駛,pp,driven
+93,給,pp,given
+93,拿到 / 得到 / 變得 / 收到,pp,gotten
+93,(第一次)認識/見面,pp,met
+93,離開,pp,left
+93,寫,pp,written
+93,餵,pp,fed
+93,看到 / 看見,pp,seen
+93,一個木乃伊,cn,a mummy
+93,讀,pp,read
+93,哈利波特和魔法石,name,Harry Potter and the Sorcerer's Stone
+94,蠻 / 相當,adv,quite
+94,一把刀子,cn,a knife
+94,一把手槍,cn,a pistol
+94,一支機關槍,cn phr,a machine gun
+94,不久之前,adv phr,a little while ago
+94,一輛廂型車,cn,a van
+94,一位職員,cn,an employee
+94,一份薪水支票,cn,a paycheck
+94,一個演出/呈現,cn,a presentation
+94,檢查庫存,v phr,to take inventory
+94,一位上司,cn,a supervisor
+94,一份期末報告,cn phr,a term paper
+94,一位房東,cn,a landlord
+94,一份電費帳單,cn phr,an electric bill
+94,說,pp,spoken
+94,付,pp,paid
+94,澆水,v,to water
+94,一隻拖鞋,cn,a slipper
+94,一個與醫生的約見(看病),cn phr,a doctor's appointment
+94,一個明細表 / 列表,cn,a list
+94,打勾,v,to check (mark)
+94,共同的 / 普通的,adj,common
+94,回去,v phr,to go back
+94,回來,v phr,to come back
+94,歸還,v phr,to give back
+94,退還,v phr,to take back
+94,帶回,v phr,to bring back
+94,放回去,v phr,to put back
+94,還錢 / 報復 / 報答,v phr,to pay back
